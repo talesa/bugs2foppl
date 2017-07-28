@@ -10,6 +10,27 @@ input:   /* empty */
 | var_stmt data_stmt model_stmt
 ;
 
+var: ID
+| ID '[' range_list ']'
+;
+
+stoch_relation:	var '~' distribution
+//| var '~' distribution truncated
+//| var '~' distribution interval
+;
+
+//interval: 'I' '(' expression ','  expression ')'
+//| 'I' '(' ',' expression ')'
+//| 'I' '(' expression ',' ')'
+//| 'I' '(' ',' ')'
+//;
+//
+//truncated: 'T' '(' expression ','  expression ')'
+//| 'T' '(' ',' expression ')'
+//| 'T' '(' expression ',' ')'
+//| 'T' '(' ',' ')'
+//;
+
 var_stmt: VAR dec_list
 | VAR dec_list ';'
 ;
@@ -18,8 +39,8 @@ dec_list: node_dec
 | dec_list ',' node_dec
 ;
 
-node_dec: NAME
-| NAME '[' dim_list ']'
+node_dec: ID
+| ID '[' dim_list ']'
 ;
 
 dim_list: expression
@@ -32,7 +53,7 @@ model_stmt: MODEL '{' relation_list '}';
 
 for_loop: counter relations;
 
-counter: FOR '(' NAME IN range_element ')' {System.out.println("var "+$NAME.text);};
+counter: FOR '(' ID IN range_element ')' {System.out.println("var "+$ID.text);};
 
 assignment: '='
 | '<-'
@@ -44,30 +65,7 @@ assignment: '='
  function is applied to the RHS of the deterministic relation
 */
 determ_relation: var assignment expression
-| func_and_bracket var ')' assignment expression;
-
-stoch_relation:	var '~' distribution
-| var '~' distribution truncated
-| var '~' distribution interval
-;
-
-i_and_bracket: 'I' '(';
-
-interval: i_and_bracket expression ','  expression ')'
-| i_and_bracket ',' expression ')'
-| i_and_bracket expression ',' ')'
-| i_and_bracket ',' ')'
-;
-
-t_and_bracket: 'T' '(';
-
-truncated: t_and_bracket expression ','  expression ')'
-| t_and_bracket ',' expression ')'
-| t_and_bracket expression ',' ')'
-| t_and_bracket ',' ')'
-;
-
-func_and_bracket: NAME '(';
+| ID '(' var ')' assignment expression;
 
 //product: expression '*' expression
 ////  This creates a shift-reduce conflict because in the expression
@@ -84,17 +82,6 @@ func_and_bracket: NAME '(';
 //| sum '+' expression
 //;
 
-//interval: 'I' '(' expression ','  expression ')'
-//| 'I' '(' ',' expression ')'
-//| 'I' '(' expression ',' ')'
-//| 'I' '(' ',' ')'
-//;
-//
-//truncated: 'T' '(' expression ','  expression ')'
-//| 'T' '(' ',' expression ')'
-//| 'T' '(' expression ',' ')'
-//| 'T' '(' ',' ')'
-//;
 
 expression: var
 | expression '^'<assoc=right> expression
@@ -108,7 +95,7 @@ expression: var
 | DOUBLE
 | LENGTH '(' var ')'
 | DIM '(' var ')'
-| func_and_bracket expression_list ')'
+| ID '(' expression_list ')'
 | expression ':' expression
 | expression SPECIAL expression
 | '(' expression ')'
@@ -136,16 +123,12 @@ range_element:
 | expression
 ;
 
-distribution: func_and_bracket ')'
+distribution: ID '(' ')'
 //BUGS has a dflat() distribution with no parameters
-| func_and_bracket expression_list ')'
+| ID '(' expression_list ')'
 ;
 
-//func: NAME '(';
-
-var: NAME
-| NAME '[' range_list ']'
-;
+//func: ID '(';
 
 
 relations: '{' relation_list '}' ;
@@ -213,10 +196,16 @@ MODEL: 'model';
 
 
 
-LENGTH: 'length' {_input.LA(1) == '('}?;
-DIM: 'dim' {_input.LA(1) == '('}?;
-FOR: 'for' {_input.LA(1) == '('}?;
-IN: 'in' {_input.LA(1) == '('}? | 'in';
+//LENGTH: 'length' {_input.LA(1) == '('}?;
+//DIM: 'dim' {_input.LA(1) == '('}?;
+//FOR: 'for' {_input.LA(1) == '('}?;
+//IN: 'in' {_input.LA(1) == '('}? | 'in';
+
+LENGTH: 'length';
+DIM: 'dim';
+FOR: 'for';
+IN: 'in';
+
 //
 //"length"/{BRACKET}      return LENGTH;
 //"dim"/{BRACKET}         return DIM;
@@ -232,17 +221,18 @@ DOUBLE: ([0-9]+) EXPONENT?
 | ([0-9]+'.'[0-9]*) EXPONENT?
 | ('.'[0-9]+) EXPONENT?;
 
+ID: [a-zA-Z] [a-zA-Z0-9._]*;
+
 //FUNC: ([a-zA-Z]+[a-zA-Z0-9\.\_]*) BRACKET ;
 //FUNC: ([a-zA-Z]+[a-zA-Z0-9._]*) BRACKET ;
 //FUNC: [a-zA-Z]+[a-zA-Z0-9]*;//[a-zA-Z0-9]* ;
-//NAME: [a-zA-Z]+s[a-zA-Z0-9\.\_]*;
-//NAME: [a-zA-Z]+[a-zA-Z0-9._]*;
+//ID: [a-zA-Z]+s[a-zA-Z0-9\.\_]*;
+//ID: [a-zA-Z]+[a-zA-Z0-9._]*;
 
-FUNC: [a-zA-Z]+[a-zA-Z0-9._]* {_input.LA(1) == '('}?;
-NAME: [a-zA-Z]+[a-zA-Z0-9._]*;
+//FUNC: [a-zA-Z]+[a-zA-Z0-9._]* {_input.LA(1) == '('}?;
 
-T: 'T' {_input.LA(1) == '('}?;
-I: 'I' {_input.LA(1) == '('}?;
+//T: 'T' {_input.LA(1) == '('}?;
+//I: 'I' {_input.LA(1) == '('}?;
 
 
 //T: 'T' BRACKET;
