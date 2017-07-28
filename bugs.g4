@@ -15,21 +15,21 @@ var: ID
 ;
 
 stoch_relation:	var '~' distribution
-//| var '~' distribution truncated
-//| var '~' distribution interval
+| var '~' distribution truncated
+| var '~' distribution interval
 ;
 
-//interval: 'I' '(' expression ','  expression ')'
-//| 'I' '(' ',' expression ')'
-//| 'I' '(' expression ',' ')'
-//| 'I' '(' ',' ')'
-//;
-//
-//truncated: 'T' '(' expression ','  expression ')'
-//| 'T' '(' ',' expression ')'
-//| 'T' '(' expression ',' ')'
-//| 'T' '(' ',' ')'
-//;
+interval: 'I' '(' expression ','  expression ')'
+| 'I' '(' ',' expression ')'
+| 'I' '(' expression ',' ')'
+| 'I' '(' ',' ')'
+;
+
+truncated: 'T' '(' expression ','  expression ')'
+| 'T' '(' ',' expression ')'
+| 'T' '(' expression ',' ')'
+| 'T' '(' ',' ')'
+;
 
 var_stmt: VAR dec_list
 | VAR dec_list ';'
