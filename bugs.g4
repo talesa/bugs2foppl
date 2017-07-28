@@ -3,7 +3,7 @@ grammar bugs;
 
 // PARSER
 
-input:   /* empty */
+input:   /* includes empty */
 | model_stmt
 | var_stmt model_stmt
 | data_stmt model_stmt
@@ -55,9 +55,7 @@ for_loop: counter relations;
 
 counter: FOR '(' ID IN range_element ')';
 
-assignment: '='
-| '<-'
-;
+assignment: '=' | '<-';
 
 /*
  The link function is given using an S-style replacement function
@@ -67,31 +65,14 @@ assignment: '='
 determ_relation: var assignment expression
 | ID '(' var ')' assignment expression;
 
-//product: expression '*' expression
-////  This creates a shift-reduce conflict because in the expression
-////  A*B*C, (A*B) is a valid expression. By default, bison shifts,
-////  which is what we want. The warning is suppressed with the %expect
-////  declaration (See also sum: below).
-//| product '*' expression
-//;
-
-//sum: expression '+' expression
-////  This creates a shift-reduce conflict. By default, bison shifts,
-////  which is what we want. The warning is suppressed with the %expect
-////  declaration (See also product: above).
-//| sum '+' expression
-//;
-
 
 expression: var
 | expression '^'<assoc=right> expression
-//| product
-| expression '*' expression // product
+| expression '*' expression
 | expression '/' expression
-//| sum
-| expression '+' expression // sum
+| expression '+' expression
 | expression '-' expression
-| negation //%prec NEG
+| negation
 | DOUBLE
 | LENGTH '(' var ')'
 | DIM '(' var ')'
@@ -99,14 +80,6 @@ expression: var
 | expression ':' expression
 | expression SPECIAL expression
 | '(' expression ')'
-//| expression GT expression
-//| expression GE expression
-//| expression LT expression
-//| expression LE expression
-//| expression EQ expression
-//| expression NE expression
-//| expression AND expression
-//| expression OR expression
 ;
 
 negation: '-' expression;
@@ -123,12 +96,10 @@ range_element:
 | expression
 ;
 
-distribution: ID '(' ')'
 //BUGS has a dflat() distribution with no parameters
+distribution: ID '(' ')'
 | ID '(' expression_list ')'
 ;
-
-//func: ID '(';
 
 
 relations: '{' relation_list '}' ;
@@ -152,66 +123,14 @@ WHITESPACE: [ \t\r\n\f]+ -> skip ; /* Eat whitespace */
 ONE_LINE_COMMENT: '#'.*?[\n] -> skip;
 COMMENT: '/*' .*? '*/' -> skip;
 
-//BRACKET: [ \t]* [(];
-
 VAR: 'var';
 DATA: 'data';
 MODEL: 'model';
-
-//IN: 'in' ;
-//SEMICOLON: ';';
-//COMMA: ',';
-//COLON: ':';
-//LSQBR: '[';
-//RSQBR: ']';
-//LBR: '(';
-//RBR: ')';
-//LCUBR: '{';
-//RCUBR: '}';
-//LE: '<=';
-//LT: '<';
-//GE: '>=';
-//GT: '>';
-//AND: '&&';
-//OR: '||';
-//NE: '!=';
-//NOT: '!';
-//EQ: '==';
-//EQUALS: '=';
-//TILDE: '~';
-//ARROW: '<-';
-//PLUS: '+';
-//MINUS: '-';
-//POWER: '^' | '**';
-//TIMES: '*';
-//SLASH: '/';
-
-
-
-
-//LENGTH: 'length' BRACKET;
-//DIM: 'dim' BRACKET;
-//FOR: 'for' BRACKET;
-//IN: 'in' BRACKET | 'in';
-
-
-
-//LENGTH: 'length' {_input.LA(1) == '('}?;
-//DIM: 'dim' {_input.LA(1) == '('}?;
-//FOR: 'for' {_input.LA(1) == '('}?;
-//IN: 'in' {_input.LA(1) == '('}? | 'in';
 
 LENGTH: 'length';
 DIM: 'dim';
 FOR: 'for';
 IN: 'in';
-
-//
-//"length"/{BRACKET}      return LENGTH;
-//"dim"/{BRACKET}         return DIM;
-//"for"/{BRACKET}        	return FOR;
-//"in"/{BRACKET}		return IN;
-
 
 /* Special operators, e.g. %*% for matrix multiplication */
 SPECIAL: '%'+[^% \t\r\n]*'%';
@@ -222,22 +141,3 @@ DOUBLE: ([0-9]+) EXPONENT?
 | ('.'[0-9]+) EXPONENT?;
 
 ID: [a-zA-Z] [a-zA-Z0-9._]*;
-
-//FUNC: ([a-zA-Z]+[a-zA-Z0-9\.\_]*) BRACKET ;
-//FUNC: ([a-zA-Z]+[a-zA-Z0-9._]*) BRACKET ;
-//FUNC: [a-zA-Z]+[a-zA-Z0-9]*;//[a-zA-Z0-9]* ;
-//ID: [a-zA-Z]+s[a-zA-Z0-9\.\_]*;
-//ID: [a-zA-Z]+[a-zA-Z0-9._]*;
-
-//FUNC: [a-zA-Z]+[a-zA-Z0-9._]* {_input.LA(1) == '('}?;
-
-//T: 'T' {_input.LA(1) == '('}?;
-//I: 'I' {_input.LA(1) == '('}?;
-
-
-//T: 'T' BRACKET;
-//I: 'I' BRACKET;
-//T: 'T';
-//I: 'I';
-//"T"/{BRACKET}           return 'T';
-//"I"/{BRACKET}           return 'I';
