@@ -1,3 +1,5 @@
-# [BUGS](https://www.mrc-bsu.cam.ac.uk/software/bugs) to FOPPL transpiler
+# BUGS to FOPPL transpiler
 
-FOPPL stands for First Order Probabilistic Programming Language, in this case a stripped down version of [Anglican](http://www.robots.ox.ac.uk/~fwood/anglican).
+[BUGS](https://www.mrc-bsu.cam.ac.uk/software/bugs) (Bayesian inference Using Gibbs Sampling) is a flexible software for the Bayesian analysis of statistical models using Markov chain Monte Carlo (MCMC) methods.
+
+FOPPL (First Order Probabilistic Programming Language) is a stripped down version of [Anglican](http://www.robots.ox.ac.uk/~fwood/anglican).
