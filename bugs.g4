@@ -1,4 +1,4 @@
-grammar Hello;
+grammar bugs;
 
 
 // PARSER
@@ -53,7 +53,7 @@ model_stmt: MODEL '{' relation_list '}';
 
 for_loop: counter relations;
 
-counter: FOR '(' ID IN range_element ')' {System.out.println("var "+$ID.text);};
+counter: FOR '(' ID IN range_element ')';
 
 assignment: '='
 | '<-'
