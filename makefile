@@ -1,9 +1,9 @@
 antlr4=java org.antlr.v4.gui.TestRig
 grun=java -Xmx500M org.antlr.v4.Tool
 
-default: HelloParser.java
-	$(antlr4) Hello input -tokens input
+default: bugsParser.java
+	$(antlr4) bugs input -tokens examples/v1_rats
 
-HelloParser.java: Hello.g4
-	$(grun) Hello.g4
+bugsParser.java: bugs.g4
+	$(grun) bugs.g4
 	javac *.java
