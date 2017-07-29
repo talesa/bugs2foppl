@@ -12,6 +12,11 @@ input:   /* includes empty */
 
 var: ID
 | ID '[' range_list ']'
+// Workaround for I and T to be recognized as names of variables as well
+| 'T'
+| 'T' '[' range_list ']'
+| 'I'
+| 'I' '[' range_list ']'
 ;
 
 stoch_relation:	var '~' distribution
