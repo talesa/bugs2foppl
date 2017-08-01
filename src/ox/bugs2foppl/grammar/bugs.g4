@@ -1,25 +1,25 @@
 grammar bugs;
 
-
 // PARSER
 
 input:   /* includes empty */
-| model_stmt
-| var_stmt model_stmt
-| data_stmt model_stmt
-| var_stmt data_stmt model_stmt
+| modelStatement
+| varStatement modelStatement
+| dataStatement modelStatement
+| varStatement dataStatement modelStatement
 ;
 
-var: ID
-| ID '[' range_list ']'
+var:
+  name=ID
+| name=ID '[' rangeList ']'
 // Workaround for I and T to be recognized as names of variables as well
-| 'T'
-| 'T' '[' range_list ']'
-| 'I'
-| 'I' '[' range_list ']'
+| name='T'
+| name='T' '[' rangeList ']'
+| name='I'
+| name='I' '[' rangeList ']'
 ;
 
-stoch_relation:	var '~' distribution
+stochasticRelation:	var '~' distribution
 | var '~' distribution truncated
 | var '~' distribution interval
 ;
@@ -36,29 +36,29 @@ truncated: 'T' '(' expression ','  expression ')'
 | 'T' '(' ',' ')'
 ;
 
-var_stmt: VAR dec_list
-| VAR dec_list ';'
+varStatement: VAR declarationList
+| VAR declarationList ';'
 ;
 
-dec_list: node_dec
-| dec_list ',' node_dec
+declarationList: nodeDeclaration
+| declarationList ',' nodeDeclaration
 ;
 
-node_dec: ID
-| ID '[' dim_list ']'
+nodeDeclaration: ID
+| ID '[' dimensionsList ']'
 ;
 
-dim_list: expression
-| dim_list ',' expression
+dimensionsList: expression
+| dimensionsList ',' expression
 ;
 
-data_stmt: DATA '{' relation_list '}';
+dataStatement: DATA '{' relationList '}';
 
-model_stmt: MODEL '{' relation_list '}';
+modelStatement: MODEL '{' relationList '}';
 
-for_loop: counter relations;
+forLoop: counter relations;
 
-counter: FOR '(' ID IN range_element ')';
+counter: FOR '(' ID IN rangeElement ')';
 
 assignment: '=' | '<-';
 
@@ -67,11 +67,29 @@ assignment: '=' | '<-';
  notation.  We need to turn this round so the inverse link
  function is applied to the RHS of the deterministic relation
 */
-determ_relation: var assignment expression
+deterministicRelation: var assignment expression
 | ID '(' var ')' assignment expression;
 
 
-expression: var
+//expression:
+//  var                                       # variable
+//| expression '^'<assoc=right> expression    # power
+//| expression '*' expression                 # mult
+//| expression '/' expression                 # div
+//| expression '+' expression                 # add
+//| expression '-' expression                 # subtract
+//| negation                                  # atom
+//| DOUBLE                                    # atom
+//| LENGTH '(' var ')'                        # atom
+//| DIM '(' var ')'                           # atom
+//| ID '(' expressionList ')'                 # atom
+//| expression ':' expression                 # atom
+//| expression SPECIAL expression             # atom
+//| '(' expression ')'                        # atom
+//;
+
+expression:
+  var
 | expression '^'<assoc=right> expression
 | expression '*' expression
 | expression '/' expression
@@ -81,7 +99,7 @@ expression: var
 | DOUBLE
 | LENGTH '(' var ')'
 | DIM '(' var ')'
-| ID '(' expression_list ')'
+| ID '(' expressionList ')'
 | expression ':' expression
 | expression SPECIAL expression
 | '(' expression ')'
@@ -89,35 +107,38 @@ expression: var
 
 negation: '-' expression;
 
-expression_list: expression
-| expression_list ',' expression
+expressionList:
+  expression                        # expressionList1
+| expression ',' expressionList     # expressionList2
 ;
 
-range_list: range_element
-| range_list ',' range_element
+rangeList: rangeElement
+| rangeList ',' rangeElement
 ;
 
-range_element:
+rangeElement:
 | expression
 ;
 
 //BUGS has a dflat() distribution with no parameters
-distribution: ID '(' ')'
-| ID '(' expression_list ')'
+distribution:
+  ID '(' ')'
+| ID '(' expressionList ')'
 ;
 
+relations: '{' relationList '}' ;
 
-relations: '{' relation_list '}' ;
-
-relation_list:	relation
-| relation_list relation
+relationList:
+  relation                  # relationList1
+| relation relationList     # relationList2
 ;
 
-relation: stoch_relation
-| determ_relation
-| for_loop
-| stoch_relation ';'
-| determ_relation ';'
+relation:
+  stochasticRelation ';'
+| stochasticRelation
+| deterministicRelation ';'
+| deterministicRelation
+| forLoop
 ;
 
 // LEXER
