@@ -10,5 +10,5 @@ default: $(antlr_gen)/bugsParser.java
 #	cd $(antlr_gen); $(antlr4) bugs input -tokens ../examples/v1_rats
 
 $(antlr_gen)/bugsParser.java: $(antlr_grammar)/bugs.g4
-	cd $(antlr_grammar); $(grun) bugs.g4 -o ../gen -package $(package_name)
+	cd $(antlr_grammar); $(grun) bugs.g4 -o ../gen -package $(package_name) -visitor -listener
 	javac $(antlr_gen)/*.java
