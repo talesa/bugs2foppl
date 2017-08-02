@@ -95,7 +95,13 @@ public class GeneralTreePass extends bugsBaseListener {
 	
 	@Override public void enterDeterministicRelation(bugsParser.DeterministicRelationContext ctx) { }
 	
-	@Override public void exitDeterministicRelation(bugsParser.DeterministicRelationContext ctx) { }
+	@Override public void exitDeterministicRelation(bugsParser.DeterministicRelationContext ctx) {
+        String output = "";
+        output += outputForNode.get(ctx.var());
+        output += " ";
+        output += outputForNode.get(ctx.expression());
+        outputForNode.put(ctx, output);
+    }
 	
 	@Override public void enterExpression(bugsParser.ExpressionContext ctx) { }
 	
@@ -118,9 +124,9 @@ public class GeneralTreePass extends bugsBaseListener {
     @Override public void exitExpressionList2(bugsParser.ExpressionList2Context ctx) {
         // Just appends the consecutive expressions with spaces in between
         String output = "";
-        output += outputForNode.get(ctx.expressionList());
-        output += " ";
         output += outputForNode.get(ctx.expression());
+        output += " ";
+        output += outputForNode.get(ctx.expressionList());
         outputForNode.put(ctx, output);
     }
 	
@@ -160,7 +166,12 @@ public class GeneralTreePass extends bugsBaseListener {
 	@Override public void enterRelationList1(bugsParser.RelationList1Context ctx) { }
 
     @Override public void exitRelationList1(bugsParser.RelationList1Context ctx) {
-        outputForNode.put(ctx, outputForNode.get(ctx.relation()));
+        String output = "";
+        output += "(let [";
+        output += outputForNode.get(ctx.relation());
+        output += "]";
+        output += ")";
+        outputForNode.put(ctx, output);
     }
 
     @Override public void enterRelationList2(bugsParser.RelationList2Context ctx) { }
@@ -168,9 +179,12 @@ public class GeneralTreePass extends bugsBaseListener {
     @Override public void exitRelationList2(bugsParser.RelationList2Context ctx) {
         // Just appends the consecutive expressions with spaces in between
         String output = "";
-        output += outputForNode.get(ctx.relationList());
-        output += " ";
+        output += "(let [";
         output += outputForNode.get(ctx.relation());
+        output += "]";
+        output += " ";
+        output += outputForNode.get(ctx.relationList());
+        output += ")";
         outputForNode.put(ctx, output);
     }
 	
@@ -178,12 +192,11 @@ public class GeneralTreePass extends bugsBaseListener {
 	
 	@Override public void exitRelation(bugsParser.RelationContext ctx) {
         String output = "";
-        output += "(let [";
+
         output += outputForNode.get(ctx.children.get(0));
-        output += "])";
+
         outputForNode.put(ctx, output);
     }
-
 	
 	@Override public void enterEveryRule(ParserRuleContext ctx) { }
 	
