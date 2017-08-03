@@ -19,7 +19,8 @@ var:
 | name='I' '[' rangeList ']'
 ;
 
-stochasticRelation:	var '~' distribution
+stochasticRelation:
+  var '~' distribution
 | var '~' distribution truncated
 | var '~' distribution interval
 ;
@@ -67,43 +68,44 @@ assignment: '=' | '<-';
  notation.  We need to turn this round so the inverse link
  function is applied to the RHS of the deterministic relation
 */
-deterministicRelation: var assignment expression
+deterministicRelation:
+  var assignment expression
 | ID '(' var ')' assignment expression;
 
 
-//expression:
-//  var                                       # variable
-//| expression '^'<assoc=right> expression    # power
-//| expression '*' expression                 # mult
-//| expression '/' expression                 # div
-//| expression '+' expression                 # add
-//| expression '-' expression                 # subtract
-//| negation                                  # atom
-//| DOUBLE                                    # atom
-//| LENGTH '(' var ')'                        # atom
-//| DIM '(' var ')'                           # atom
-//| ID '(' expressionList ')'                 # atom
-//| expression ':' expression                 # atom
-//| expression SPECIAL expression             # atom
-//| '(' expression ')'                        # atom
-//;
-
 expression:
-  var
-| expression '^'<assoc=right> expression
-| expression '*' expression
-| expression '/' expression
-| expression '+' expression
-| expression '-' expression
-| negation
-| DOUBLE
-| LENGTH '(' var ')'
-| DIM '(' var ')'
-| ID '(' expressionList ')'
-| expression ':' expression
-| expression SPECIAL expression
-| '(' expression ')'
+  var                                       # passExpression
+| expression '^'<assoc=right> expression    # exponentiation
+| expression '*' expression                 # arithmetic
+| expression '/' expression                 # arithmetic
+| expression '+' expression                 # arithmetic
+| expression '-' expression                 # arithmetic
+| negation                                  # passExpression
+| DOUBLE                                    # passExpression
+| LENGTH '(' var ')'                        # passExpression
+| DIM '(' var ')'                           # passExpression
+| ID '(' expressionList ')'                 # function
+| expression ':' expression                 # passExpression
+| expression SPECIAL expression             # passExpression
+| '(' expression ')'                        # parenExpression
 ;
+
+//expression:
+//  var
+//| expression '^'<assoc=right> expression
+//| expression '*' expression
+//| expression '/' expression
+//| expression '+' expression
+//| expression '-' expression
+//| negation
+//| DOUBLE
+//| LENGTH '(' var ')'
+//| DIM '(' var ')'
+//| ID '(' expressionList ')'
+//| expression ':' expression
+//| expression SPECIAL expression
+//| '(' expression ')'
+//;
 
 negation: '-' expression;
 
