@@ -26,17 +26,13 @@ public class GeneralTreePass extends bugsBaseListener {
 //	@Override public void enterStochasticRelation(bugsParser.StochasticRelationContext ctx) { }
 	
 	@Override public void exitStochasticRelation(bugsParser.StochasticRelationContext ctx) {
-        String output = "";
-
         // TODO if it's an observed variable and the appropriate data is in data then it should result in an observe variable
 
         // I return whatever is inside let [...] so basically pairs of variables
-        output += outputForNode.get(ctx.var());
-        output += " ";
-        output += "(sample ";
-        output += outputForNode.get(ctx.distribution());
-        output += ")";
-
+        String output = String.format(
+                "%s (sample %s)",
+                outputForNode.get(ctx.var()),
+                outputForNode.get(ctx.distribution()));
         outputForNode.put(ctx, output);
     }
 	
@@ -71,11 +67,9 @@ public class GeneralTreePass extends bugsBaseListener {
 //	@Override public void enterModelStatement(bugsParser.ModelStatementContext ctx) { }
 	
 	@Override public void exitModelStatement(bugsParser.ModelStatementContext ctx) {
-        String output = "";
-//
-//        output += "(let [";
-        output += outputForNode.get(ctx.relationList());
-//        output += "])";
+        String output = String.format(
+                "%s",
+                outputForNode.get(ctx.relationList()));
         outputForNode.put(ctx, output);
     }
 	
@@ -94,10 +88,10 @@ public class GeneralTreePass extends bugsBaseListener {
 //	@Override public void enterDeterministicRelation(bugsParser.DeterministicRelationContext ctx) { }
 	
 	@Override public void exitDeterministicRelation(bugsParser.DeterministicRelationContext ctx) {
-        String output = "";
-        output += outputForNode.get(ctx.var());
-        output += " ";
-        output += outputForNode.get(ctx.expression());
+        String output = String.format(
+                "%s %s",
+                outputForNode.get(ctx.var()),
+                outputForNode.get(ctx.expression()));
         outputForNode.put(ctx, output);
     }
 	
@@ -126,10 +120,10 @@ public class GeneralTreePass extends bugsBaseListener {
 
     @Override public void exitExpressionList2(bugsParser.ExpressionList2Context ctx) {
         // Just appends the consecutive expressions with spaces in between
-        String output = "";
-        output += outputForNode.get(ctx.expression());
-        output += " ";
-        output += outputForNode.get(ctx.expressionList());
+        String output = String.format(
+                "%s %s",
+                outputForNode.get(ctx.expression()),
+                outputForNode.get(ctx.expressionList()));
         outputForNode.put(ctx, output);
     }
 	
@@ -152,13 +146,11 @@ public class GeneralTreePass extends bugsBaseListener {
             case "dgamma": FOPPLDistributionName = "gamma"; break;
         }
 
-        String output = "";
-        output += "(";
-        output += FOPPLDistributionName;
-        output += " ";
         // TODO there might be an error here in case of dflat() distribution
-        output += outputForNode.get(ctx.expressionList());
-        output += ")";
+        String output = String.format(
+                "(%s %s)",
+                FOPPLDistributionName,
+                outputForNode.get(ctx.expressionList()));
 
         // TODO need to add interval and truncation
 
@@ -172,11 +164,9 @@ public class GeneralTreePass extends bugsBaseListener {
 //	@Override public void enterRelationList1(bugsParser.RelationList1Context ctx) { }
 
     @Override public void exitRelationList1(bugsParser.RelationList1Context ctx) {
-        String output = "";
-        output += "(let [";
-        output += outputForNode.get(ctx.relation());
-        output += "]";
-        output += ")";
+        String output = String.format(
+                "(let [%s])",
+                outputForNode.get(ctx.relation()));
         outputForNode.put(ctx, output);
     }
 
@@ -184,22 +174,18 @@ public class GeneralTreePass extends bugsBaseListener {
 
     @Override public void exitRelationList2(bugsParser.RelationList2Context ctx) {
         // Just appends the consecutive expressions with spaces in between
-        String output = "";
-        output += "(let [";
-        output += outputForNode.get(ctx.relation());
-        output += "]";
-        output += " ";
-        output += outputForNode.get(ctx.relationList());
-        output += ")";
+        String output = String.format(
+                "(let [%s] %s)",
+                outputForNode.get(ctx.relation()),
+                outputForNode.get(ctx.relationList()));
+
         outputForNode.put(ctx, output);
     }
 	
 //	@Override public void enterRelation(bugsParser.RelationContext ctx) { }
 	
 	@Override public void exitRelation(bugsParser.RelationContext ctx) {
-        String output = "";
-
-        output += outputForNode.get(ctx.children.get(0));
+        String output = outputForNode.get(ctx.children.get(0));
 
         outputForNode.put(ctx, output);
     }
@@ -214,41 +200,31 @@ public class GeneralTreePass extends bugsBaseListener {
             case "sqrt": FOPPLFunctionName = "sqrt";
         }
 
-        String output = "";
-        output += "(";
-        output += FOPPLFunctionName;
-        output += " ";
-        output += outputForNode.get(ctx.expressionList());
-        output += ")";
+        String output = String.format(
+                "(%s %s)",
+                FOPPLFunctionName,
+                outputForNode.get(ctx.expressionList()));
 
         outputForNode.put(ctx, output);
     }
 
     @Override public void exitExponentiation(bugsParser.ExponentiationContext ctx) {
-        String output = "";
-        output += "(";
-        output += "math/expt";
-        output += " ";
-        output += outputForNode.get(ctx.expression(0));
-        output += " ";
-        output += outputForNode.get(ctx.expression(1));
-        output += ")";
+        String output = String.format(
+                "(%s %s %s)",
+                "math/expt",
+                outputForNode.get(ctx.expression(0)),
+                outputForNode.get(ctx.expression(1)));
 
         outputForNode.put(ctx, output);
     }
 
     @Override public void exitArithmetic(bugsParser.ArithmeticContext ctx) {
-        String output = "";
-        output += "(";
-
         // multiplication *, division /, addition +, subtraction -
-        output += ctx.getChild(1).getText();
-
-        output += " ";
-        output += outputForNode.get(ctx.expression(0));
-        output += " ";
-        output += outputForNode.get(ctx.expression(1));
-        output += ")";
+        String output = String.format(
+                "(%s %s %s)",
+                ctx.getChild(1).getText(),
+                outputForNode.get(ctx.expression(0)),
+                outputForNode.get(ctx.expression(1)));
 
         outputForNode.put(ctx, output);
     }
