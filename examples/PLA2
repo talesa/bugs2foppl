@@ -1,9 +1,0 @@
-model {
-  for (i in 1:N) {
-    psihat[i] ~ dnorm(psi[i], 1/(sigma[i])^2)
-    psi[i] ~ dnorm(mu, 1/tau^2)
-  }
-  mu ~ dnorm(0, 1/(1000*tau^2))
-  tau <- 1/sqrt(gam)
-  gam ~ dgamma(0.1, 0.1)
-}

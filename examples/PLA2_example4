@@ -1,5 +1,0 @@
-model {
-  for (i in 1:N) {
-    psi[i] ~ dnorm(0, 1)
-  }
-}Ļ

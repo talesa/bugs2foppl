@@ -1,4 +1,0 @@
-model {
-  mu ~ dnorm(0, tau)
-  tau <- 1
-}

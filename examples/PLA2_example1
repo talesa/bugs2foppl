@@ -1,3 +1,0 @@
-model {
-  v ~ dnorm(0, 1)
-}

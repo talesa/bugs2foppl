@@ -1,5 +1,0 @@
-model {
-  mu ~ dnorm(0, 1/(1000*tau^2))
-  tau <- 1/sqrt(gam)
-  gam ~ dgamma(0.1, 0.1)
-}
