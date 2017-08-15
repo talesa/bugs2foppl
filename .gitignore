@@ -2,3 +2,11 @@
 .idea
 *.tokens
 temp
+target
+.nrepl-port
+.swp
+checkouts
+src/foppl
+temp.clj
+pom.xml
+examples/examples_JAGS
