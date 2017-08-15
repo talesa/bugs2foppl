@@ -75,20 +75,27 @@ deterministicRelation:
 
 expression:
   var                                       # passExpression
-|<assoc=right> expression '^' expression    # exponentiation
-| expression '*' expression                 # arithmetic
-| expression '/' expression                 # arithmetic
-| expression '+' expression                 # arithmetic
-| expression '-' expression                 # arithmetic
+| exponentiation
+| arithmetic
 | negation                                  # passExpression
 | DOUBLE                                    # passExpression
 | LENGTH '(' var ')'                        # passExpression
 | DIM '(' var ')'                           # passExpression
-| ID '(' expressionList ')'                 # function
+| function                                  
 | expression ':' expression                 # passExpression
 | expression SPECIAL expression             # passExpression
 | '(' expression ')'                        # parenExpression
 ;
+
+function: ID '(' expressionList ')';
+
+arithmetic:
+  expression '*' expression                 # arithmetic
+| expression '/' expression                 # arithmetic
+| expression '+' expression                 # arithmetic
+| expression '-' expression                 # arithmetic
+
+exponentiation: <assoc=right> expression '^' expression;
 
 //expression:
 //  var
