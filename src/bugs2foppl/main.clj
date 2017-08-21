@@ -84,7 +84,8 @@
   (list "(" (nth node 2) (nth node 1) (nth node 3) ")"))
 (defmethod translate-node-visit :modelStatement [node]
   (list "(foppl-query" (nth node 3) ")"))
-
+(defmethod translate-node-visit :parenExpression [node]
+  (list (nth node 2)))
 
 
 (defn visit-children
@@ -121,12 +122,17 @@
     {to-var node}))
 
 (let [tree (parse "grammars/bugs.g4" "examples/PLA2_example3")
-      e (v2 tree {})
-      g (apply digraph e)
-      tg (topsort g)
-      n (v4 tree)]
-  [tg n])
+      es (v2 tree {})
+      g (apply digraph es)
+      nso (topsort g)
+      v2n (v4 tree)
+      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk translate-node-visit n))))
+      nodes (fn [v2n nso] (map (partial get v2n) nso))]
+  ; (n2t tree))
+  (map n2t (nodes v2n nso)))
 
 (let [tree (parse "grammars/bugs.g4" "examples/PLA2_example3")
       output (walk-ast postwalk translate-node-visit tree)]
-  (println (clojure.string/join " " (flatten output))))
+  (println output))
+
+(println (slurp "examples/PLA2_example3"))
