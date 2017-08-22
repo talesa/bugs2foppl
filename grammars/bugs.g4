@@ -10,13 +10,13 @@ input:   /* includes empty */
 ;
 
 var:
-  name=ID
-| name=ID '[' rangeList ']'
+  name=ID                     # varID
+| name=ID '[' rangeList ']'   # varIndexed
 // Workaround for I and T to be recognized as names of variables as well
-| name='T'
-| name='T' '[' rangeList ']'
-| name='I'
-| name='I' '[' rangeList ']'
+| name='T'                    # varID
+| name='T' '[' rangeList ']'  # varIndexed
+| name='I'                    # varID
+| name='I' '[' rangeList ']'  # varIndexed
 ;
 
 stochasticRelation:
@@ -85,7 +85,7 @@ expression:
 | LENGTH '(' var ')'                        # passExpression
 | DIM '(' var ')'                           # passExpression
 | ID '(' expressionList ')'                 # function
-| expression ':' expression                 # passExpression
+| expression ':' expression                 # rangeExpression
 | expression SPECIAL expression             # passExpression
 | '(' expression ')'                        # parenExpression
 ;

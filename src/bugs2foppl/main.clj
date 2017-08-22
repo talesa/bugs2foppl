@@ -88,6 +88,30 @@
   (list (nth node 2)))
 
 
+; for loop
+(defmethod translate-node-visit :rangeExpression [node]
+  {:min (nth node 1)
+   :max (nth node 3)})
+
+(defmethod translate-node-visit :counter [node]
+  (merge {:var (nth node 3)} (nth node 5)))
+
+(defmethod translate-node-visit :forLoop [node]
+  (let [params (nth node 1)
+        relations (nth node 2)]
+    (forloop-change-names node)))
+
+
+(defmulti forloop-change-names (fn [node] (first node)))
+(defmethod forloop-change-names :varIndexed [node] node)
+(defmethod forloop-change-names :varIndexed [node]
+  (if (= :varID (nth node 3))))
+
+
+(let [tree (parse "grammars/bugs.g4" "examples/PLA2_example4")]
+  tree)
+
+
 (defn visit-children
   "Returns a sequence of visited children."
   [visit-func node & context]
@@ -107,7 +131,7 @@
   (let [to-var (second (second node)) ; var name string
         context (assoc context :to-var to-var)]
     (v2 (nth node 3) context)))
-(defmethod v2 :var [node context]
+(defmethod v2 :varID [node context]
   (list (list (second node) (:to-var context))))
 
 
@@ -135,4 +159,4 @@
       output (walk-ast postwalk translate-node-visit tree)]
   (println output))
 
-(println (slurp "examples/PLA2_example3"))
+(println (slurp "examples/PLA2_example4"))
