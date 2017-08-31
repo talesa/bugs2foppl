@@ -1,18 +1,23 @@
 (ns bugs2foppl.utils
   (require [clj-antlr.coerce :as coerce]
            [clj-antlr.interpreted :as interpreted]
-           :reload-all)
+           [clojure.math.combinatorics :as combo]
+           [clojure.java.io :as io])
+          ;  :reload-all)
   (use [clojure.pprint :only [pprint]]
        [clojure.inspector :only (inspect-tree)]
        [loom.graph]
        [loom.io :only (view)]
        [loom.alg :only (topsort)]
        [clojure.walk]
-       [foppl.core]
-       [anglican core runtime emit stat]
-       :reload-all))
+       [clojure.tools.trace]
+       [clojure.stacktrace]))
+      ;  [foppl.core]))
+      ;  [anglican core runtime emit stat]
+      ;  :reload-all))
 
 
+; TODO there is sth silly going on here because I have both the loop-recur and the explicit recursion
 (defn v2m [a dim]
   (if (empty? dim)
     a
@@ -24,10 +29,11 @@
           (recur (nthrest a l)
                  (conj b (v2m (take l a) (rest dim)))))))))
 
-
 (defn parse
-  [grammar-file input-file]
-  (let [input-string (slurp input-file)
+  [grammar-file input-file-or-string]
+  (let [input-string (if (.exists (io/file input-file-or-string))
+                       (slurp input-file-or-string)
+                       input-file-or-string)
         grammar-str (slurp grammar-file)
         grammar (interpreted/grammar grammar-str)
         m (interpreted/parse grammar {} input-string)
@@ -50,9 +56,10 @@
 
 (defn foppl-distr-for [distr]
   (case distr
-    "dnorm"   'normal
-    "dgamma"  'gamma
-    "dunif"    'uniform-continuous))
+    "dnorm"   "normal"
+    "dgamma"  "gamma"
+    "dunif"   "uniform-continuous"
+    "dbin"    "binomial"))
 
 (defn foppl-func-for [func]
   (case func
@@ -98,50 +105,58 @@
 
 ; TODO macro to make those definitions shorter
 
-(defmulti translate-node-visit (fn [node] (first node)))
-(defmethod translate-node-visit :default [node] (second node))
+(defmulti translate-node-visit (fn [data node] (first node)))
+(defmethod translate-node-visit :default [data node] (second node))
 
-(defmethod translate-node-visit :stochasticRelation [node]
-  (list (nth node 1) "(sample" (nth node 3) ")"))
-(defmethod translate-node-visit :deterministicRelation [node]
+(defmethod translate-node-visit :stochasticRelation [data node]
+  (let [var-str (second (find-first :varID (nth node 1)))
+        var-str (nth node 1)] ; these 2 should be equivalent
+    (pprint var-str)
+    (if (contains? data var-str)
+      (list "(observe" (nth node 3) (get data var-str) ")")
+      (list var-str "(sample" (nth node 3) ")"))))
+(defmethod translate-node-visit :deterministicRelation [data node]
   (list (nth node 1) (nth node 3)))
-(defmethod translate-node-visit :expressionList2 [node]
+(defmethod translate-node-visit :expressionList2 [data node]
   (list (nth node 1) (nth node 3)))
-(defmethod translate-node-visit :distribution [node]
+(defmethod translate-node-visit :distribution [data node]
   (list "(" (foppl-distr-for (nth node 1)) (nth node 3) ")"))
-(defmethod translate-node-visit :relationList1 [node]
+(defmethod translate-node-visit :relationList1 [data node]
   (list "(let [" (nth node 1) "])"))
-(defmethod translate-node-visit :relationList2 [node]
+(defmethod translate-node-visit :relationList2 [data node]
   (list "(let [" (nth node 1) "]" (nth node 2) ")"))
-(defmethod translate-node-visit :function [node]
+(defmethod translate-node-visit :function [data node]
   (list "(" (foppl-func-for (nth node 1)) (nth node 3) ")"))
-(defmethod translate-node-visit :exponentiation [node]
+(defmethod translate-node-visit :exponentiation [data node]
   (list "(math/expt" (nth node 1) (nth node 3) ")"))
-(defmethod translate-node-visit :arithmetic [node]
+(defmethod translate-node-visit :arithmetic [data node]
   (list "(" (nth node 2) (nth node 1) (nth node 3) ")"))
-(defmethod translate-node-visit :modelStatement [node]
+(defmethod translate-node-visit :modelStatement [data node]
   (list "(foppl-query" (nth node 3) ")"))
-(defmethod translate-node-visit :parenExpression [node]
+(defmethod translate-node-visit :parenExpression [data node]
   (list (nth node 2)))
 
-(defn find-nodes [type node]
-  (if (= (first node) type)
-    (list node)
-    (apply concat
-           (visit-children (partial find-first-node type) node))))
 
-(defn find-first [type node] (first (find-nodes type node)))
+
+; TODO possibly change to tail recursion?
+(defn find-nodes
+  "Returns seq of type nodes found within root."
+  [type root]
+  (if (= (first root) type)
+    (list root)
+    (apply concat
+           (visit-children (partial find-nodes type) root))))
+
+(defn find-first
+  "Returns first type node within root."
+  [type root]
+  (first (find-nodes type root)))
+
+
+
+
 
 ; UNROLLING FORLOOPS
-(def vars {
-           "r" '(10, 23, 23, 26, 17, 5, 53, 55, 32, 46, 10, 8, 10, 8, 23, 0, 3, 22, 15, 32, 3)
-           "n" '(39, 62, 81, 51, 39, 6, 74, 72, 51, 79, 13, 16, 30, 28, 45, 4, 12, 41, 30, 51, 7)
-           "x1" '(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-           "x2" '(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1)
-           "N" 21})
-
-(let [] vars)
-
 (defn var-or-int
   "val is a string. If val is a number returns that number, if val is a key in coll, return the value of that key."
   [val coll]
@@ -153,113 +168,128 @@
          n
          (throw (Exception. "max value of a for loop counter is neither a declared variable nor a number"))))))
 
+(defn text [node] (walk-ast postwalk (fn [node] (clojure.string/join " " (rest node))) node))
 
-;lower bound always 1
-;upper bound always variable in data
-(defmethod translate-node-visit :rangeExpression [node]
-  {:min (nth node 1)
-   :max (var-or-int (nth node 3) vars)})
+; TODO possibly change this to loop recur
+(defn create-expression-list
+  "Returns a syntax tree consisting of :relationList nodes given sequence of relations."
+  [relations]
+  (if (= 1 (count relations))
+    (list
+     :relationList1
+     (list :relation (first relations)))
+    (list
+     :relationList2
+     (list :relation (first relations))
+     (create-expression-list (rest relations)))))
 
-(defmethod translate-node-visit :counter [node]
-  (merge {:var (nth node 3)} (nth node 5)))
+(defn vars-ranges-from-counter [counter-node]
+  (let [var-name-str  (nth counter-node 3)
+        ; var-name-sym  (symbol var-name-str)
+        range-expr    (find-first :rangeExpression counter-node)
+        ; TODO these two below may need to be evaluated or read from the var list etc, for now the assumption is these are numbers in string format
+        var-min       (var-or-int (text (nth range-expr 1)) vars)
+        var-max       (var-or-int (text (nth range-expr 3)) vars)
+        var-range     (range var-min (+ 1 var-max))]
+    {var-name-str var-range}))
 
-(defmulti forloop-change-names (fn [node] (first node)))
-(defmethod forloop-change-names :varIndexed [node]
-  (if (= :varID (nth node 3)) node))
+(defn unsugar-var [var-name-str index] (str var-name-str "_" index))
 
-(defmethod translate-node-visit :forLoop [node]
-  (let [params (nth node 1)
-        relations (nth node 2)]
-    (list params relations)))
+(defn nnth [index coll] (nth coll index))
 
-(defmethod translate-node-visit :relations [node]
-  (nth node 2))
-
-(parse "grammars/bugs.g4" "examples/PLA2_example4")
-
-
-(let [tree (parse "grammars/bugs.g4" "examples/PLA2_example4")
-      forloop (first (find-nodes :forLoop tree))]
-  (walk-ast postwalk translate-node-visit forloop))
-
-(let [tree (parse "grammars/bugs.g4" "examples/PLA2_example4")
-      forloop (first (find-nodes :forLoop tree))]
-  forloop)
-
-; first I will have function which only hits forloop and then unrolls it
+(defmulti substitute-varindexed-with-varid (fn [vars-binding node] (first node)))
+(defmethod substitute-varindexed-with-varid :default [vars-binding node] node)
+(defmethod substitute-varindexed-with-varid :varIndexed [vars-binding node]
+  (let [var-name-str  (nnth 1 node)
+        vars          (keys vars-binding)
+        values        (vals vars-binding)
+        range-element (nnth 1 (nnth 3 node))
+        ; assuming range-element is just a single varID for now
+        index-str    (nnth 1 (nnth 1 (nnth 1 range-element)))
+        index-val     (get vars-binding index-str)]
+    (list
+     :varID
+     (unsugar-var var-name-str index-val))))
 
 
-; e.g.
+(defn unroll-loop-relation [node vars-ranges]
+  ; (let [vars-ranges ["i" (range 1 11)
+  ;                    "j" (range 1 11)]])
+  (let [relation (second node)
+        vars (keys vars-ranges)
+        ranges (vals vars-ranges)
+        tuples (apply combo/cartesian-product ranges)
+        vars-bindings (map (partial into {}) (map (partial map vector) (repeat vars) tuples))
+        ; (let [vars-binding ["i" 2
+        ;                     "j" 3]])
+        f (fn [vars-binding node] (walk-ast postwalk (partial substitute-varindexed-with-varid vars-binding) node))]
+    (map f vars-bindings (repeat relation))))
+    ; TODO probably there will be a need for some quoting magic here because I will need to evaluate the expressions in the indeces
+    ; I am traversing this node to substitute for each of the iterations of the unrolling - this is inefficient, surely there is a better way
+
+; we need vars-ranges here as the argument because it may be a nested loop
+(defmulti unroll-loop (fn [vars-ranges node] (first node)))
+(defmethod unroll-loop :default [vars-ranges node] node)
+
 ; (let [vars-ranges [x (range 2)
 ;                    y (range 2)])
 ; each nested loop will add the appropriate range to vars-ranges
 ; for now a single variable
-(defmethod fl :forloop [node context]
-  (let [output-relations (list)
-        counter (nth node 1)
-        context (update-vars-ranges-context context counter)
-        ; TODO this will fail with nested for loops because it will also traverse into the next :forloop, I need a way to terminate the descent
-        relations (find-nodes :relation (nth node 2))]
-    (map unroll-loop-relation relations (repeat context))))
-
-(defn update-vars-ranges-context [context counter]
-  (let [vars-ranges (:vars-ranges context)
+(defmethod unroll-loop :forLoop [vars-ranges node]
+  (let [counter (nth node 1)
         vars-ranges (merge vars-ranges (vars-ranges-from-counter counter))
-        context (assoc context
-                       :vars-ranges vars-ranges)]
-    context))
+        ; TODO this will fail with nested for loops because it will also traverse into the next :forLoop, I need a way to terminate the descent
+        relations (find-nodes :relation (nth node 2))]
+    (create-expression-list (apply concat (map unroll-loop-relation relations (repeat vars-ranges))))))
 
-(defn unroll-loop-relation [relation context]
-  (let [relation (second node)
-        vars-ranges (:vars-ranges context)
-        ; substitute func must know what variables its supposed to substitute
-        vars (take-nth 2 vars-ranges)]
-    ; TODO probably there will be a need for some quoting magic here
-    (for vars-ranges
-         ; I am traversing this node to substitute for each of the iterations of the unrolling - this is inefficient, surely there is a better way
-         (substitute-varid-for-varindexed relation vars))))
-
-(defmulti substitute-varid-for-varindexed [node] (first node))
-(defmethod substitute-varid-for-varindexed :default [node] node
-  (let [f (fn [node])]))
+; TODO not sure if I can use syntax quote here because let evaluates to clojure.core/let and not sure if that will work within foppl compiler
+(defn relations-to-sugared-let
+  "Transforms a sequence of untranslated relations to a sugared foppl let statement with translated relations."
+  [relations]
+  (list 'let (read-string (str "[" (clojure.string/join " " relations) "]"))))
+  ; `(let ~relations))
 
 
+(defn unroll-data [data]
+  ; there might be some obscure side effects with seq? here such as breaking down strings into sequences of chars
+  (let [seqs (filter (comp seq? val) vars)
+        f1 (fn [kv]
+             (for [i (range (count (val kv)))]
+              {(unsugar-var (key kv) (inc i)) (nth (val kv) i)}))]
+    (apply merge data (flatten (map f1 seqs)))))
 
-(defn text [node] (walk-ast postwalk (fn [node] (str (rest node)) node)))
+(def vars (unroll-data {"r" '(10, 23, 23, 26, 17, 5, 53, 55, 32, 46, 10, 8, 10, 8, 23, 0, 3, 22, 15, 32, 3)
+                        "n" '(39, 62, 81, 51, 39, 6, 74, 72, 51, 79, 13, 16, 30, 28, 45, 4, 12, 41, 30, 51, 7)
+                        "x1" '(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+                        "x2" '(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1)
+                        "N" 4}))
 
-(defn vars-ranges-from-counter [counter-node]
-  (let [var-name-str  (nth counter-node 3)
-        var-name-sym  (symbol var-name-str)
-        range-expr    (find-first :rangeExpression counter-node)
-        ; TODO these two below may need to be evaluated or read from the var list etc, for now the assumption is these are numbers in string format
-        var-min       (number (text (nth range-expr 1)))
-        var-max       (number (text (nth range-expr 3)))
-        var-range     (range var-min (+ 1 var-max))]
-    (vector var-name-sym var-range)))
+(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
+      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
+      output (flatten (walk-ast postwalk (partial translate-node-visit vars) unrolled))]
+  ; output
+  ; (read-string (clojure.string/join " " output))
+  unrolled)
 
-
-; (defmethod fl :relation [node context]
-;   (let [relation (second node)
-;         varIndexed (second relation)
-;         vars-ranges (:vars-ranges context)
-;         vars  (take-nth 2 vars-ranges)
-;         index (second (first (find-nodes :varID varIndexed)))
-;         relation-type (first relation)
-;         output-relations (list)]
-;     (if (contains? vars index)
-;       (for vars-ranges
-;            (list :relation
-;                  (list relation-type
-;                        (merge
-;                         (list :varID (unsugar-var (second varIndexed)))
-;                         (nthrest relation 2)))))
-;       node)))
-
-(defn unsugar-var [var index] (str var "_" index))
-
-(let [output-relations (list)])
+(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
+      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
+      es (get-graph-edges unrolled {})
+      g (apply digraph es)
+      nso (topsort g)
+      v2n (build-relation-node-map unrolled)
+      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit vars) n))))
+      nodes (fn [v2n nso] (map (partial get v2n) nso))
+      output (map n2t (nodes v2n nso))]
+  (relations-to-sugared-let (filter (complement clojure.string/blank?) output)))
 
 
-; probably need to put recursive generation of :relationList2 here
-; it can be a seperate function
-; or I don't because it is just a list of relationships
+(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
+      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
+      es (get-graph-edges unrolled {})
+      g (apply digraph es)
+      nso (topsort g)
+      v2n (build-relation-node-map unrolled)
+      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit vars) n))))
+      nodes (fn [v2n nso] (map (partial get v2n) nso))
+      output (map n2t (nodes v2n nso))]
+  (relations-to-sugared-let (filter (complement clojure.string/blank?) output)))

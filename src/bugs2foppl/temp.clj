@@ -1,7 +1,8 @@
 (ns zippers.domain
-  (require [clojure.set :as set])
-  (use [bugs2foppl.utils]
-       [anglican core runtime emit stat]))
+  (require [clojure.set :as set]
+           [clojure.math.combinatorics :as combo]))
+  ; (use [bugs2foppl.utils]
+      ;  [anglican core runtime emit stat]))
 
 (defn- expected-keys? [map expected-key-set]
   (not (seq (set/difference (set (keys map)) expected-key-set))))
@@ -90,3 +91,18 @@
    (for [b (range 2)] b))
 
 (take 100 (for [x (range 100000000) y (range 1000000) :while (< y x)] [x y]))
+
+
+; combinatorics
+(combo/cartesian-product [1 2])
+
+
+;unrolling loop
+(let [vars ["a" "b"]
+      ranges [(range 1 (inc 2)) (range 3 (inc 5))]
+      map-var-val  (into {} (map vector vars ranges))
+      vars (keys map-var-val)
+      ranges (vals map-var-val)
+      tuples   (apply combo/cartesian-product ranges)
+      vars-bindings (map (partial into {}) (map (partial map vector) (repeat vars) tuples))]
+  vars-bindings)

@@ -1,13 +1,10 @@
 (ns bugs2foppl.main
   (use [clojure.pprint :only [pprint]]
        [bugs2foppl.utils]
-       [clojure.inspector :only (inspect-tree)]
        [loom.graph]
        [loom.io :only (view)]
        [loom.alg :only (topsort)]
        [clojure.walk]
-       [foppl.core]
-       [anglican core runtime emit stat]
        :reload-all))
 
 
@@ -20,8 +17,6 @@
 ; (inspect-tree (parse "grammars/R_data2.g4" "examples/examples_JAGS/classic-bugs/vol1/blocker/bench-test2.R"))
 
 (println (slurp "examples/PLA2_example3"))
-
-
 
 
 ; TODO maybe think about this derive issue but not now
@@ -40,12 +35,13 @@
       g (apply digraph es)
       nso (topsort g)
       v2n (build-relation-node-map tree)
-      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk translate-node-visit n))))
-      nodes (fn [v2n nso] (map (partial get v2n) nso))]
-  (map n2t (nodes v2n nso)))
+      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit {}) n))))
+      nodes (fn [v2n nso] (map (partial get v2n) nso))
+      output (map n2t (nodes v2n nso))]
+  output)
 
 (let [tree (parse "grammars/bugs.g4" "examples/PLA2_example3")
-      output (walk-ast postwalk translate-node-visit tree)]
+      output (walk-ast postwalk (partial translate-node-visit {}) tree)]
   (println output))
 
 (println (slurp "examples/PLA2_example4"))
