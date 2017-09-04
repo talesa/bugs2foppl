@@ -4,9 +4,9 @@ grammar bugs;
 
 input:   /* includes empty */
 | modelStatement
-| varStatement modelStatement
-| dataStatement modelStatement
-| varStatement dataStatement modelStatement
+// | varStatement modelStatement
+// | dataStatement modelStatement
+// | varStatement dataStatement modelStatement
 ;
 
 var:
@@ -57,9 +57,17 @@ dataStatement: DATA '{' relationList '}';
 
 modelStatement: MODEL '{' relationList '}';
 
+rangeList: rangeElement
+| rangeList ',' rangeElement
+;
+
+rangeElement:
+| expression
+;
+
 forLoop: counter relations;
 
-counter: FOR '(' ID IN rangeElement ')';
+counter: FOR '(' var IN rangeElement ')';
 
 assignment: '=' | '<-';
 
@@ -69,58 +77,34 @@ assignment: '=' | '<-';
  function is applied to the RHS of the deterministic relation
 */
 deterministicRelation:
-  var assignment expression
-| ID '(' var ')' assignment expression;
+  var assignment expression                 # deterministicRelation1
+| ID '(' var ')' assignment expression      # deterministicRelationLink
+;
 
+expressionList:
+  expression                        //# expressionList1
+| expressionList ',' expression     //# expressionList2
+//| expression ',' expressionList     //# expressionList2
+;
 
 expression:
-  var                                       # passExpression
+  var                                       # varExpression
 |<assoc=right> expression '^' expression    # exponentiation
 | expression '*' expression                 # arithmetic
 | expression '/' expression                 # arithmetic
 | expression '+' expression                 # arithmetic
 | expression '-' expression                 # arithmetic
-| negation                                  # passExpression
-| DOUBLE                                    # passExpression
-| LENGTH '(' var ')'                        # passExpression
-| DIM '(' var ')'                           # passExpression
+| '-' expression                            # negation
+| DOUBLE                                    # atom
+| LENGTH '(' var ')'                        # lenExpression
+| DIM '(' var ')'                           # dimExpression
 | ID '(' expressionList ')'                 # function
 | expression ':' expression                 # rangeExpression
-| expression SPECIAL expression             # passExpression
+| expression SPECIAL expression             # specialExpression
 | '(' expression ')'                        # parenExpression
 ;
 
-//expression:
-//  var
-//| expression '^'<assoc=right> expression
-//| expression '*' expression
-//| expression '/' expression
-//| expression '+' expression
-//| expression '-' expression
-//| negation
-//| DOUBLE
-//| LENGTH '(' var ')'
-//| DIM '(' var ')'
-//| ID '(' expressionList ')'
-//| expression ':' expression
-//| expression SPECIAL expression
-//| '(' expression ')'
-//;
-
-negation: '-' expression;
-
-expressionList:
-  expression                        # expressionList1
-| expression ',' expressionList     # expressionList2
-;
-
-rangeList: rangeElement
-| rangeList ',' rangeElement
-;
-
-rangeElement:
-| expression
-;
+// negation: '-' expression;
 
 //BUGS has a dflat() distribution with no parameters
 distribution:
@@ -130,9 +114,11 @@ distribution:
 
 relations: '{' relationList '}' ;
 
+// TODO changes here, may break sth
 relationList:
-  relation                  # relationList1
-| relation relationList     # relationList2
+  relation                  //# relationList1
+| relationList relation     //# relationList2
+//| relation relationList     # relationList2
 ;
 
 relation:

@@ -10,8 +10,9 @@
        [loom.io :only (view)]
        [loom.alg :only (topsort)]
        [clojure.walk]
-       [clojure.tools.trace]
-       [clojure.stacktrace]))
+      ;  [clojure.tools.trace]
+       [clojure.repl]
+       :reload-all))
       ;  [foppl.core]))
       ;  [anglican core runtime emit stat]
       ;  :reload-all))
@@ -43,6 +44,44 @@
 
 (defn node? [n] (and (seq? n) (keyword? (first n))))
 
+(defn visit-children
+  "Returns a sequence of visited children."
+  [visit-func node & context]
+  (if (empty? context)
+    (map visit-func (filter node? (rest node)))
+    (map visit-func (filter node? (rest node)) (repeat (first context)))))
+
+; TODO possibly change to tail recursion?
+(defn find-nodes
+  "Returns seq of type nodes found within root."
+  [type root]
+  (if (= (first root) type)
+    (list root)
+    (apply concat
+           (visit-children (partial find-nodes type) root))))
+
+(defn find-first
+  "Returns first type node within root."
+  [type root]
+  (first (find-nodes type root)))
+
+(defn unsugar-var [var-name-str index] (str var-name-str "_" index))
+
+(defn nnth [index coll] (nth coll index))
+
+(defn unroll-data [data]
+  ; there might be some obscure side effects with seq? here such as breaking down strings into sequences of chars
+  (let [seqs (filter (comp seq? val) data)
+        f1 (fn [kv]
+             (for [i (range (count (val kv)))]
+              {(unsugar-var (key kv) (inc i)) (nth (val kv) i)}))]
+    (apply merge data (flatten (map f1 seqs)))))
+
+(def vars (unroll-data {"r" '(10, 23, 23, 26, 17, 5, 53, 55, 32, 46, 10, 8, 10, 8, 23, 0, 3, 22, 15, 32, 3)
+                        "n" '(39, 62, 81, 51, 39, 6, 74, 72, 51, 79, 13, 16, 30, 28, 45, 4, 12, 41, 30, 51, 7)
+                        "x1" '(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+                        "x2" '(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1)
+                        "N" 4}))
 
 (defn walk-ast
   "Uses walker to apply rule-node-visit only to rule nodes of the tree, rather than token nodes."
@@ -56,22 +95,15 @@
 
 (defn foppl-distr-for [distr]
   (case distr
-    "dnorm"   "normal"
-    "dgamma"  "gamma"
-    "dunif"   "uniform-continuous"
-    "dbin"    "binomial"))
+    "dnorm"   'normal
+    "dgamma"  'gamma
+    "dunif"   'uniform-continuous
+    "dbin"    'binomial))
 
 (defn foppl-func-for [func]
   (case func
-    "sqrt"   "sqrt"))
+    "sqrt"   'sqrt))
 
-
-(defn visit-children
-  "Returns a sequence of visited children."
-  [visit-func node & context]
-  (if (empty? context)
-    (map visit-func (filter node? (rest node)))
-    (map visit-func (filter node? (rest node)) (repeat (first context)))))
 
 
 ; sub it with edges
@@ -83,7 +115,7 @@
   (let [to-var (second (second node)) ; var name string
         context (assoc context :to-var to-var)]
     (get-graph-edges (nth node 3) context)))
-(defmethod get-graph-edges :deterministicRelation [node context]
+(defmethod get-graph-edges :deterministicRelation1 [node context]
   (let [to-var (second (second node)) ; var name string
         context (assoc context :to-var to-var)]
     (get-graph-edges (nth node 3) context)))
@@ -98,7 +130,7 @@
 (defmethod build-relation-node-map :stochasticRelation [node]
   (let [to-var (second (second node))] ; var name string
     {to-var node}))
-(defmethod build-relation-node-map :deterministicRelation [node]
+(defmethod build-relation-node-map :deterministicRelation1 [node]
   (let [to-var (second (second node))] ; var name string
     {to-var node}))
 
@@ -115,7 +147,7 @@
     (if (contains? data var-str)
       (list "(observe" (nth node 3) (get data var-str) ")")
       (list var-str "(sample" (nth node 3) ")"))))
-(defmethod translate-node-visit :deterministicRelation [data node]
+(defmethod translate-node-visit :deterministicRelation1 [data node]
   (list (nth node 1) (nth node 3)))
 (defmethod translate-node-visit :expressionList2 [data node]
   (list (nth node 1) (nth node 3)))
@@ -135,25 +167,6 @@
   (list "(foppl-query" (nth node 3) ")"))
 (defmethod translate-node-visit :parenExpression [data node]
   (list (nth node 2)))
-
-
-
-; TODO possibly change to tail recursion?
-(defn find-nodes
-  "Returns seq of type nodes found within root."
-  [type root]
-  (if (= (first root) type)
-    (list root)
-    (apply concat
-           (visit-children (partial find-nodes type) root))))
-
-(defn find-first
-  "Returns first type node within root."
-  [type root]
-  (first (find-nodes type root)))
-
-
-
 
 
 ; UNROLLING FORLOOPS
@@ -192,10 +205,6 @@
         var-max       (var-or-int (text (nth range-expr 3)) vars)
         var-range     (range var-min (+ 1 var-max))]
     {var-name-str var-range}))
-
-(defn unsugar-var [var-name-str index] (str var-name-str "_" index))
-
-(defn nnth [index coll] (nth coll index))
 
 (defmulti substitute-varindexed-with-varid (fn [vars-binding node] (first node)))
 (defmethod substitute-varindexed-with-varid :default [vars-binding node] node)
@@ -246,50 +255,5 @@
 (defn relations-to-sugared-let
   "Transforms a sequence of untranslated relations to a sugared foppl let statement with translated relations."
   [relations]
-  (list 'let (read-string (str "[" (clojure.string/join " " relations) "]"))))
-  ; `(let ~relations))
-
-
-(defn unroll-data [data]
-  ; there might be some obscure side effects with seq? here such as breaking down strings into sequences of chars
-  (let [seqs (filter (comp seq? val) vars)
-        f1 (fn [kv]
-             (for [i (range (count (val kv)))]
-              {(unsugar-var (key kv) (inc i)) (nth (val kv) i)}))]
-    (apply merge data (flatten (map f1 seqs)))))
-
-(def vars (unroll-data {"r" '(10, 23, 23, 26, 17, 5, 53, 55, 32, 46, 10, 8, 10, 8, 23, 0, 3, 22, 15, 32, 3)
-                        "n" '(39, 62, 81, 51, 39, 6, 74, 72, 51, 79, 13, 16, 30, 28, 45, 4, 12, 41, 30, 51, 7)
-                        "x1" '(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-                        "x2" '(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1)
-                        "N" 4}))
-
-(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
-      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
-      output (flatten (walk-ast postwalk (partial translate-node-visit vars) unrolled))]
-  ; output
-  ; (read-string (clojure.string/join " " output))
-  unrolled)
-
-(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
-      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
-      es (get-graph-edges unrolled {})
-      g (apply digraph es)
-      nso (topsort g)
-      v2n (build-relation-node-map unrolled)
-      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit vars) n))))
-      nodes (fn [v2n nso] (map (partial get v2n) nso))
-      output (map n2t (nodes v2n nso))]
-  (relations-to-sugared-let (filter (complement clojure.string/blank?) output)))
-
-
-(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
-      unrolled (walk-ast postwalk (partial unroll-loop {}) input)
-      es (get-graph-edges unrolled {})
-      g (apply digraph es)
-      nso (topsort g)
-      v2n (build-relation-node-map unrolled)
-      n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit vars) n))))
-      nodes (fn [v2n nso] (map (partial get v2n) nso))
-      output (map n2t (nodes v2n nso))]
-  (relations-to-sugared-let (filter (complement clojure.string/blank?) output)))
+  ; (list 'let (read-string (str "[" (clojure.string/join " " relations) "]")))
+  `(~'let ~relations))
