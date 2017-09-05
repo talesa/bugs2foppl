@@ -17,18 +17,16 @@
       ;  [anglican core runtime emit stat]
       ;  :reload-all))
 
+(defn count1? [coll] (= 1 (count coll)))
 
-; TODO there is sth silly going on here because I have both the loop-recur and the explicit recursion
-(defn v2m [a dim]
-  (if (empty? dim)
-    a
-    (let [l (/ (count a) (first dim))]
-      (loop [a a
-             b []]
-        (if (empty? a)
-          b
-          (recur (nthrest a l)
-                 (conj b (v2m (take l a) (rest dim)))))))))
+(defn v2m
+  "Forms an nested vector array of dimensions dims from a vector coll."
+  [coll lens]
+  {:pre [(= (apply * lens) (count coll))]}
+  (if (count1? lens)
+    (vec coll)
+    (let [partitioned (partition (apply * (rest lens)) coll)]
+      (vec (map #(v2m % (rest lens)) partitioned)))))
 
 (defn node? [n] (and (seq? n) ((some-fn keyword? symbol?) (first n))))
 
@@ -142,7 +140,6 @@
 
 (defmulti translate-node-visit (fn [data node] (first node)))
 (defmethod translate-node-visit :default [data node] (second node))
-
 (defmethod translate-node-visit :stochasticRelation [data node]
   (let [var-str (second (find-first :varID (nth node 1)))
         var-str (nth node 1)] ; these 2 should be equivalent
@@ -150,26 +147,6 @@
     (if (contains? data var-str)
       (list "(observe" (nth node 3) (get data var-str) ")")
       (list var-str "(sample" (nth node 3) ")"))))
-(defmethod translate-node-visit :deterministicRelation1 [data node]
-  (list (nth node 1) (nth node 3)))
-(defmethod translate-node-visit :expressionList2 [data node]
-  (list (nth node 1) (nth node 3)))
-(defmethod translate-node-visit :distribution [data node]
-  (list "(" (foppl-distr-for (nth node 1)) (nth node 3) ")"))
-(defmethod translate-node-visit :relationList1 [data node]
-  (list "(let [" (nth node 1) "])"))
-(defmethod translate-node-visit :relationList2 [data node]
-  (list "(let [" (nth node 1) "]" (nth node 2) ")"))
-(defmethod translate-node-visit :function [data node]
-  (list "(" (foppl-fn-for (nth node 1)) (nth node 3) ")"))
-(defmethod translate-node-visit :exponentiation [data node]
-  (list "(math/expt" (nth node 1) (nth node 3) ")"))
-(defmethod translate-node-visit :arithmetic [data node]
-  (list "(" (nth node 2) (nth node 1) (nth node 3) ")"))
-(defmethod translate-node-visit :modelStatement [data node]
-  (list "(foppl-query" (nth node 3) ")"))
-(defmethod translate-node-visit :parenExpression [data node]
-  (list (nth node 2)))
 
 
 ; UNROLLING FORLOOPS
