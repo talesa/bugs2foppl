@@ -1,87 +1,103 @@
-grammar R_data;
+grammar bugs_data;
 
-//prog:   (expr (';'|NL) | NL)* EOF;
+input: varAssignmentList;
 
-prog:   expr* EOF;
+varAssignmentList:
+  varAssignment
+| varAssignmentList varAssignment;
 
-/*
-expr_or_assign
-    :   expr ('<-'|'='|'<<-') expr_or_assign
-    |   expr
+varAssignment: STRING '<-' expr ;
+
+//value: expr;
+//      scalar
+//    |
+//    | structure
+//    ;
+
+number: FLOAT | INT | COMPLEX;
+
+//column: ID '(' sublist ')';
+
+//structure: STRUCTURE '(' column ',' propertyList ')';
+
+//propertyList:
+//      property (',' property)*
+//    ;
+
+//property:
+//      ID '=' expr;
+
+expr:   expr '[[' sublist ']' ']'                             # expression
+    |   expr '[' sublist ']'                                  # expression
+    |   ID ('<-'|'<<-'|'='|'->'|'->>'|':=') expr              # assignment
+    // |   expr '(' sublist ')'                                  # functionCall
+    |   ID '(' sublist ')'                                  # functionCall
+    |   expr ('::'|':::') expr                                # expression
+    |   expr ('$'|'@') expr                                   # expression
+    |   <assoc=right> expr '^' expr                           # expression
+    |   ('-'|'+') expr                                        # expression
+    |   expr ':' expr                                         # expression
+    // anything wrappedin %: '%' .* '%'
+    |   expr USER_OP expr                                     # expression
+    |   expr ('*'|'/') expr                                   # expression
+    |   expr ('+'|'-') expr                                   # expression
+    |   expr ('>'|'>='|'<'|'<='|'=='|'!=') expr               # expression
+    |   '!' expr                                              # expression
+    |   expr ('&'|'&&') expr                                  # expression
+    |   expr ('|'|'||') expr                                  # expression
+    |   '~' expr                                              # expression
+    |   expr '~' expr                                         # expression
+//    |   'function' '(' formlist? ')' expr                     # functionDefinition
+    // compound statement
+//    |   '{' exprlist '}'                                      # expression
+    |   'if' '(' expr ')' expr                                # expression
+    |   'if' '(' expr ')' expr 'else' expr                    # expression
+    |   'for' '(' ID 'in' expr ')' expr                       # expression
+    |   'while' '(' expr ')' expr                             # expression
+    |   'repeat' expr                                         # expression
+    // get help on expr, usually STRING or ID
+    |   '?' expr                                              # expression
+    |   'next'                                                # expression
+    |   'break'                                               # expression
+    |   '(' expr ')'                                          # expression
+    |   ID                                                    # expression
+    |   STRING                                                # expression
+    |   HEX                                                   # expression
+    |   number                                                # numberexpr
+    |   'NULL'                                                # expression
+    |   'NA'                                                  # expression
+    |   'Inf'                                                 # expression
+    |   'NaN'                                                 # expression
+    |   'TRUE'                                                # expression
+    |   'FALSE'                                               # expression
     ;
-*/
 
-expr:   expr '[[' sublist ']' ']'  // '[[' follows R's yacc grammar
-    |   expr '[' sublist ']'
-    |   expr ('::'|':::') expr
-    |   expr ('$'|'@') expr
-    |   <assoc=right> expr '^' expr
-    |   ('-'|'+') expr
-    |   expr ':' expr
-    |   expr USER_OP expr // anything wrappedin %: '%' .* '%'
-    |   expr ('*'|'/') expr
-    |   expr ('+'|'-') expr
-    |   expr ('>'|'>='|'<'|'<='|'=='|'!=') expr
-    |   '!' expr
-    |   expr ('&'|'&&') expr
-    |   expr ('|'|'||') expr
-    |   '~' expr
-    |   expr '~' expr
-    |   expr ('<-'|'<<-'|'='|'->'|'->>'|':=') expr
-    |   'function' '(' formlist? ')' expr // define function
-    |   expr '(' sublist ')'              // call function
-    |   '{' exprlist '}' // compound statement
-    |   'if' '(' expr ')' expr
-    |   'if' '(' expr ')' expr 'else' expr
-    |   'for' '(' ID 'in' expr ')' expr
-    |   'while' '(' expr ')' expr
-    |   'repeat' expr
-    |   '?' expr // get help on expr, usually string or ID
-    |   'next'
-    |   'break'
-    |   '(' expr ')'
-    |   ID
-    |   STRING
-    |   HEX
-    |   INT
-    |   FLOAT
-    |   COMPLEX
-    |   'NULL'
-    |   'NA'
-    |   'Inf'
-    |   'NaN'
-    |   'TRUE'
-    |   'FALSE'
-    ;
-
-exprlist
-    :   expr ((';'|NL) expr?)*
-    |
-    ;
-
-formlist : form (',' form)* ;
-
-form:   ID
-    |   ID '=' expr
-    |   '...'
-    ;
-
-sublist : sub (',' sub)* ;
+sublist :
+  sub
+| sublist ',' sub
+;
 
 sub :   expr
-    |   ID '='
-    |   ID '=' expr
-    |   STRING '='
-    |   STRING '=' expr
-    |   'NULL' '='
-    |   'NULL' '=' expr
-    |   '...'
-    |
+//    |   ID '='
+//    |   ID '=' expr
+//    |   STRING '='
+//    |   STRING '=' expr
+//    |   'NULL' '='
+//    |   'NULL' '=' expr
     ;
+
+STRING:   '"' ( ESC | ~[\\"] )*? '"'
+    |   '\'' ( ESC | ~[\\'] )*? '\''
+    |   '`' ( ESC | ~[\\'] )*? '`'
+    ;
+
+//STRUCTURE: 'structure';
 
 HEX :   '0' ('x'|'X') HEXDIGIT+ [Ll]? ;
 
 INT :   DIGIT+ [Ll]? ;
+
+//ASSIGNMENT : '<-' ;
 
 fragment
 HEXDIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;
@@ -98,12 +114,6 @@ EXP :   ('E' | 'e') ('+' | '-')? INT ;
 COMPLEX
     :   INT 'i'
     |   FLOAT 'i'
-    ;
-
-STRING
-    :   '"' ( ESC | ~[\\"] )*? '"'
-    |   '\'' ( ESC | ~[\\'] )*? '\''
-    |   '`' ( ESC | ~[\\'] )*? '`'
     ;
 
 fragment
