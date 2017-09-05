@@ -30,6 +30,18 @@
           (recur (nthrest a l)
                  (conj b (v2m (take l a) (rest dim)))))))))
 
+(defn node? [n] (and (seq? n) ((some-fn keyword? symbol?) (first n))))
+
+(defn walk-ast
+  "Uses walker to apply rule-node-visit only to rule nodes of the tree, rather than token nodes."
+  ([rule-node-visit tree] (walk-ast clojure.walk/postwalk rule-node-visit tree))
+  ([walker rule-node-visit tree]
+   (let [f (fn [n] (if (node? n)
+                     (rule-node-visit n)
+                     n))]
+     (let [new-tree (do (walker f tree))]
+       new-tree))))
+
 (defn parse
   [grammar-file input-file-or-string]
   (let [input-string (if (.exists (io/file input-file-or-string))
@@ -40,9 +52,6 @@
         m (interpreted/parse grammar {} input-string)
         e (coerce/tree->sexpr m)]
     e))
-
-
-(defn node? [n] (and (seq? n) (keyword? (first n))))
 
 (defn visit-children
   "Returns a sequence of visited children."
@@ -77,34 +86,28 @@
               {(unsugar-var (key kv) (inc i)) (nth (val kv) i)}))]
     (apply merge data (flatten (map f1 seqs)))))
 
+(defn sanitize-var-name [var-name] (clojure.string/replace var-name "." "-"))
+
 (def vars (unroll-data {"r" '(10, 23, 23, 26, 17, 5, 53, 55, 32, 46, 10, 8, 10, 8, 23, 0, 3, 22, 15, 32, 3)
                         "n" '(39, 62, 81, 51, 39, 6, 74, 72, 51, 79, 13, 16, 30, 28, 45, 4, 12, 41, 30, 51, 7)
                         "x1" '(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
                         "x2" '(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1)
                         "N" 4}))
 
-(defn walk-ast
-  "Uses walker to apply rule-node-visit only to rule nodes of the tree, rather than token nodes."
-  [walker rule-node-visit tree]
-  (let [f (fn [n] (if (node? n)
-                    (rule-node-visit n)
-                    n))]
-    (let [new-tree (do (walker f tree))]
-      new-tree)))
-
-
 (defn foppl-distr-for [distr]
-  (case distr
+  (case (str distr)
     "dnorm"   'normal
     "dgamma"  'gamma
     "dunif"   'uniform-continuous
     "dbin"    'binomial))
 
-(defn foppl-func-for [func]
-  (case func
+(defn foppl-fn-for [func]
+  (case (str func)
     "sqrt"   'sqrt))
 
-
+(defn foppl-inv-link-fn-for [func]
+  (case (str func)
+    "logit"  'sigmoid))
 
 ; sub it with edges
 (defmulti get-graph-edges (fn [node context] (first node)))
@@ -158,7 +161,7 @@
 (defmethod translate-node-visit :relationList2 [data node]
   (list "(let [" (nth node 1) "]" (nth node 2) ")"))
 (defmethod translate-node-visit :function [data node]
-  (list "(" (foppl-func-for (nth node 1)) (nth node 3) ")"))
+  (list "(" (foppl-fn-for (nth node 1)) (nth node 3) ")"))
 (defmethod translate-node-visit :exponentiation [data node]
   (list "(math/expt" (nth node 1) (nth node 3) ")"))
 (defmethod translate-node-visit :arithmetic [data node]
