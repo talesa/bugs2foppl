@@ -161,10 +161,63 @@
 
 
 ; PASS 3
-; 
 
-
-(let [input (parse "grammars/bugs.g4" "examples/v1_seeds")
-      p1 (walk-ast postwalk pass1 input)
+(let [p0 (parse "grammars/bugs.g4" "examples/v1_seeds")
+      p1 (walk-ast postwalk pass1 p0)
       p2 (walk-ast postwalk pass2 p1)]
   p2)
+
+
+; DATA PASS 1
+
+(defmulti dpass1 first)
+(defmethod dpass1 :default [node] node)
+(defmethod dpass1 :input [[_ var-assignment-list]]
+  (list 'assignment-list var-assignment-list))
+(defmethod dpass1 :varAssignmentList [node]
+  (extract-seq-from-left-recursive-rule node :no-comma))
+(defn strip-quotes [stringg] (clojure.string/replace stringg "\"" ""))
+(defmethod dpass1 :varAssignment [[_ name _ expr]]
+  (list (symbol (sanitize-var-name (strip-quotes name))) expr))
+(defmethod dpass1 :sublist [node]
+  (extract-seq-from-left-recursive-rule node :comma))
+(defmethod dpass1 :sub [[_ rst]] rst)
+(defmethod dpass1 :functionCall [[_ name _ sublist]]
+  (concat ['function (symbol name)] sublist))
+(defmethod dpass1 :number [[_ number]] (read-string number))
+(defmethod dpass1 :numberexpr [[_ number]] number)
+(defmethod dpass1 :assignment [[_ name _ expr]]
+  (list 'assignment name expr))
+(defmethod dpass1 :expression [[_ & rst]]
+  (list 'expression rst))
+
+
+
+; DATA PASS 2
+
+(defmulti dpass2 first)
+(defmethod dpass2 :default [node] node)
+(defmethod dpass2 'function [[_ name & args]]
+  (case (str name)
+    "c" args
+    "as.integer" (map int (first args))
+    "structure" (concat [(symbol name)] args)
+    "list" args))
+
+(defmulti dpass3 first)
+(defmethod dpass3 :default [node] node)
+(defmethod dpass3 'structure [[_ coll & assignments]]
+  (let [dim-assgn (filter #(= (second %) ".Dim") assignments)
+        dims (nnth 2 (first dim-assgn))]
+    (v2m coll dims)))
+
+(defmulti dpass4 first)
+(defmethod dpass4 :default [node] node)
+(defmethod dpass4 'assignment-list  [[_ assignments]]
+  (list 'let (vec (apply concat assignments))))
+
+(->> (parse "grammars/R_data.g4" "examples/dyes-data.R")
+     (walk-ast postwalk dpass1)
+     (walk-ast postwalk dpass2)
+     (walk-ast postwalk dpass3)
+     (walk-ast postwalk dpass4))
