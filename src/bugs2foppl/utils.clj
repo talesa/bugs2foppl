@@ -237,3 +237,11 @@
   [relations]
   ; (list 'let (read-string (str "[" (clojure.string/join " " relations) "]")))
   `(~'let ~relations))
+
+(defmacro node-traversal-method [type body]
+  (let [name (gensym)]
+    `(let []
+       (defmulti ~name first)
+       (defmethod ~name :default [n#] n#)
+       (defmethod ~name ~type [m#] (~body m#))
+       ~name)))
