@@ -19,6 +19,15 @@
 
 (defn count1? [coll] (= 1 (count coll)))
 
+(defn vec-max
+  "Element-wise vector max function."
+  [a b]
+  (if (= a nil)
+    b
+    (if (= b nil)
+      a
+      (vec (map max a b)))))
+
 (defn v2m
   "Forms an nested vector array of dimensions dims from a vector coll."
   [coll lens]
@@ -51,12 +60,21 @@
         e (coerce/tree->sexpr m)]
     e))
 
+; (defn visit-children
+;   "Returns a sequence of visited children."
+;   [visit-func node & context]
+;   (if (empty? context)
+;     (map visit-func (filter node? (rest node)))
+;     (map visit-func (filter node? (rest node)) (repeat (first context)))))
+
 (defn visit-children
   "Returns a sequence of visited children."
-  [visit-func node & context]
-  (if (empty? context)
-    (map visit-func (filter node? (rest node)))
-    (map visit-func (filter node? (rest node)) (repeat (first context)))))
+  ([visit-func node]
+   (map visit-func (filter node? (rest node))))
+  ([visit-func node context]
+   (map visit-func
+        (filter node? (rest node))
+        (repeat context))))
 
 ; TODO possibly change to tail recursion?
 (defn find-nodes
@@ -245,3 +263,33 @@
        (defmethod ~name :default [n#] n#)
        (defmethod ~name ~type [m#] (~body m#))
        ~name)))
+
+(defn sub-var
+  [bindings-map node]
+  (walk-ast
+   (node-traversal-method 'var
+    #(let [var (second %)]
+       (if (contains? bindings-map var)
+           (get bindings-map var)
+           %)))
+   node))
+
+(defn sub-range
+  [node]
+  (walk-ast
+   (node-traversal-method 'range-inclusive
+    #(let [min (nnth 1 %)
+           max (nnth 2 %)]
+       (if (and (number? min) (number? max))
+           (range min (inc max))
+           %)))
+   node))
+
+(defn partial-eval
+  [node]
+  (walk-ast
+   #(let [output
+          (try (eval %)
+               (catch Exception e false))]
+      (if output output %))
+   node))

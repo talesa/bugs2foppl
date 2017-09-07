@@ -1,8 +1,11 @@
 (ns bugs2foppl.utils
   (require [clj-antlr.coerce :as coerce]
            [clj-antlr.interpreted :as interpreted]
-           [clojure.math.combinatorics :as combo]
-           [clojure.java.io :as io])
+          ;  [clojure.math.combinatorics :as combo]
+           [clojure.java.io :as io]
+           [zip.visit :as zv]
+           [clojure.zip :as z]
+           [clojure.xml :as xml])
           ;  :reload-all)
   (use [bugs2foppl.utils]
        [clojure.pprint :only [pprint]]
@@ -12,11 +15,9 @@
        [loom.alg :only (topsort)]
        [clojure.walk]
        [clojure.repl]
+      ;  [zip.visit]
+      ;  [clojure.zip]
        :reload-all))
-
-; PASS 1
-; sanitizes var names
-; changes the structure of the code from parser artifacts to LISP notation
 
 ; helper functions
 
@@ -36,17 +37,71 @@
          (conj (nth node 1) (nth node n))
          (vector (second node))))))
 
-; dispatched function
+; DATA PASS 1
+(defmulti dpass1 first)
+(defmethod dpass1 :default [node] node)
+(defmethod dpass1 :input [[_ var-assignment-list]]
+  (list 'assignment-list var-assignment-list))
+(defmethod dpass1 :varAssignmentList [node]
+  (extract-seq-from-left-recursive-rule node :no-comma))
+(defn strip-quotes [stringg] (clojure.string/replace stringg "\"" ""))
+(defmethod dpass1 :varAssignment [[_ name _ expr]]
+  (list (symbol (sanitize-var-name (strip-quotes name))) expr))
+(defmethod dpass1 :sublist [node]
+  (extract-seq-from-left-recursive-rule node :comma))
+(defmethod dpass1 :sub [[_ rst]] rst)
+(defmethod dpass1 :functionCall [[_ name _ sublist]]
+  (concat ['function (symbol name)] sublist))
+(defmethod dpass1 :number [[_ number]] (read-string number))
+(defmethod dpass1 :numberexpr [[_ number]] number)
+(defmethod dpass1 :assignment [[_ name _ expr]]
+  (list 'assignment name expr))
+(defmethod dpass1 :expression [[_ & rst]]
+  (list 'expression rst))
 
+; DATA PASS 2
+(defmulti dpass2 first)
+(defmethod dpass2 :default [node] node)
+(defmethod dpass2 'function [[_ name & args]]
+  (case (str name)
+    "c" args
+    "as.integer" (map int (first args))
+    "structure" (concat [(symbol name)] args)
+    "list" args))
+(defmethod dpass2 'expression [[_ expr]]
+  (case (first expr)
+    "NA" nil
+    (list 'expression expr)))
+
+; DATA PASS 3
+(defmulti dpass3 first)
+(defmethod dpass3 :default [node] node)
+(defmethod dpass3 'structure [[_ coll & assignments]]
+  (let [dim-assgn (filter #(= (second %) ".Dim") assignments)
+        dims (nnth 2 (first dim-assgn))]
+    (v2m coll dims)))
+(defmethod dpass3 'assignment-list  [[_ assignments]] assignments)
+
+; DATA PASS 4
+; (defmulti dpass4 first)
+; (defmethod dpass4 :default [node] node)
+; (defmethod dpass4 'assignment-list  [[_ assignments]]
+;   (list 'let (vec (apply concat assignments))))
+
+
+; PASS 1
+; sanitizes var names
+; changes the structure of the code from parser artifacts to LISP notation
 (defmulti pass1 first)
 (defmethod pass1 :default [node] node)
 
 (defmethod pass1 :input [[_ model]] model)
 
-(defmethod pass1 :varID [[_ name]] (symbol (sanitize-var-name name)))
+(defmethod pass1 :varID [[_ name]]
+  (list 'var (symbol (sanitize-var-name name))))
 (defmethod pass1 :varIndexed
   [[_ name _ range-list]]
-  (list 'varindexed (symbol (sanitize-var-name name)) range-list))
+  (list 'var-indexed (symbol (sanitize-var-name name)) range-list))
 (defmethod pass1 :stochasticRelation
   [[_ var _ distribution & t-or-i]]
   (if (empty? t-or-i)
@@ -99,7 +154,7 @@
 (defmethod pass1 :counter [[_ _ _ var _ range-element]]
   (if (= range-element :all)
     (throw (Exception. "Do not know how to handle :all in for loop counter."))
-    (list (symbol var) range-element)))
+    (list var range-element)))
 
 (defmethod pass1 :forLoop [[_ [var range] relations]]
   (list 'for var range relations))
@@ -129,11 +184,11 @@
 (defmethod pass1 :parenExpression [[_ _ expr]] expr)
 
 (defmethod pass1 :distribution [[_ distr & rst]]
+
   (if (= 3 (count rst))
     (apply list (cons 'distribution (cons (symbol distr) (nth rst 1))))
     ; (list (symbol distr) (nth rst 1))
     (list 'distribution (symbol distr))))
-
 (defmethod pass1 :relations [[_ _ relation-list]] relation-list)
 
 (defmethod pass1 :relationList [node]
@@ -147,7 +202,7 @@
 ; substitutes the names of the functions, distributions and inverse link functions; changes the order and the parameterization of the arguments of the functions where necessary
 
 (defmulti pass2 first)
-(defmethod pass2 :default [n] (let [] (pprint n) n))
+(defmethod pass2 :default [n] n)
 
 ; TODO some distributions and functions may need to have the order of arguments or parameterization of arguments
 (defmethod pass2 'distribution [[_ name & params]]
@@ -159,65 +214,157 @@
 (defmethod pass2 'inv-link-fn [[_ name expr]]
   (apply list (cons (foppl-inv-link-fn-for name) expr)))
 
-
 ; PASS 3
+; fill in the values of the var nodes (not var-indexed) where this is necessary to evaluate the ranges for the loop
+; unroll loops
 
-(let [p0 (parse "grammars/bugs.g4" "examples/v1_seeds")
-      p1 (walk-ast postwalk pass1 p0)
-      p2 (walk-ast postwalk pass2 p1)]
-  p2)
+; context needs to contain the static data
+
+(defmulti pass3 (fn [context node] (first node)))
+(defmethod pass3 :default [context node] node)
+
+(defmethod pass3 'for [context [_ var range relations]]
+  (let [data (:data context)
+        var-symbol (second var)
+        a (partial sub-var data)
+        range (->> range
+                   a
+                   partial-eval
+                   sub-range)]
+    (concat ['list-of-rels]
+      (apply concat
+        (map
+          (fn [var-value]
+            (map
+             (fn [relation]
+               (sub-var
+                (assoc data var-symbol var-value)
+                relation))
+             relations))
+          range)))))
+
+; PASS 4
+; gather all the relations
+(defmulti pass4 first)
+(defmethod pass4 :default [node]
+  (apply concat (visit-children pass4 node)))
+(defmethod pass4 'stochastic-relation [node] (list node))
+(defmethod pass4 'deterministic-relation [node] (list node))
 
 
-; DATA PASS 1
+; (defmulti pass5
+;   (fn [context node] (first node))
+;   :hierarchy (-> (make-hierarchy)
+;                  (derive 'stochastic-relation :relation)
+;                  (derive 'deterministic-relation :relation)
+;                  atom))
+; (defmethod pass5 :default [context node]
+;   (apply concat (visit-children pass5 node context)))
+;
+; (defmethod pass5 :relation [context node]
+;   (let [to-var (second (second node)) ; var name string
+;         context (assoc context :to-var to-var)]
+;     (pass5 (nth node 3) context)))
+; (defmethod pass5 :varID [context node]
+;   (list (list (second node) (:to-var context))))
 
-(defmulti dpass1 first)
-(defmethod dpass1 :default [node] node)
-(defmethod dpass1 :input [[_ var-assignment-list]]
-  (list 'assignment-list var-assignment-list))
-(defmethod dpass1 :varAssignmentList [node]
-  (extract-seq-from-left-recursive-rule node :no-comma))
-(defn strip-quotes [stringg] (clojure.string/replace stringg "\"" ""))
-(defmethod dpass1 :varAssignment [[_ name _ expr]]
-  (list (symbol (sanitize-var-name (strip-quotes name))) expr))
-(defmethod dpass1 :sublist [node]
-  (extract-seq-from-left-recursive-rule node :comma))
-(defmethod dpass1 :sub [[_ rst]] rst)
-(defmethod dpass1 :functionCall [[_ name _ sublist]]
-  (concat ['function (symbol name)] sublist))
-(defmethod dpass1 :number [[_ number]] (read-string number))
-(defmethod dpass1 :numberexpr [[_ number]] number)
-(defmethod dpass1 :assignment [[_ name _ expr]]
-  (list 'assignment name expr))
-(defmethod dpass1 :expression [[_ & rst]]
-  (list 'expression rst))
+; PASS 5
+; keep track of:
+; for indexed variables keep track of the maximum
+; ? set of variables binded
+; if an indexed variable associated to is not binded initiate it to array of nils of appropriate shape by looking at the indices used
+
+(zv/defvisitor keep-maximum-of-indexed-vars :pre [n s]
+  (if (and
+       (node? n)
+       (or (= (first n) 'stochastic-relation)
+           (= (first n) 'deterministic-relation))
+       (= (-> n second first) 'var-indexed))
+    (let [[_ var] n
+          [_ var-symbol var-index] var
+          max-indexed-vars (:max-indexed-vars s)
+          data (:data s)]
+      (if (not (contains? (set (keys data)) var-symbol))
+        (if (some (partial = :all) var-index)
+          (throw (Exception. "Do not know how to handle :all in keep-maximum-of-indexed-vars."))
+          {:state (assoc s :max-indexed-vars
+                         (assoc max-indexed-vars var-symbol
+                                (vec-max
+                                 (get max-indexed-vars var-symbol)
+                                 var-index)))})))))
+
+(defn initiate-nil-arrays [max-indexed-vars]
+  (map
+   (fn [[var-symbol lens]]
+     (list
+      var-symbol
+      ; TODO possibly may need to add vec here
+      (v2m (repeat (apply * lens) nil) lens)))
+   max-indexed-vars))
+
+
+; (defvisitor collect-vars-binded :pre [n s]
+;   (if (= :relation (first n))
+;     (let [[_ var] n
+;           [_ var-symbol] var]
+;       {:state (assoc s :vars-bindings
+;                      (conj
+;                       (get s :vars-bindings)
+;                       var-symbol))})))
 
 
 
-; DATA PASS 2
+; PASS
+; create the dependency graph
+;   easy for nonindexed relations
+;   for indexed varaibles assignment set the name of the node to var_i_j or sth like that
 
-(defmulti dpass2 first)
-(defmethod dpass2 :default [node] node)
-(defmethod dpass2 'function [[_ name & args]]
-  (case (str name)
-    "c" args
-    "as.integer" (map int (first args))
-    "structure" (concat [(symbol name)] args)
-    "list" args))
+; PASS
+; when changing the relations to actual binding pay attention to the fact whether the first argument is a var or a indexed var and act appropriately
 
-(defmulti dpass3 first)
-(defmethod dpass3 :default [node] node)
-(defmethod dpass3 'structure [[_ coll & assignments]]
-  (let [dim-assgn (filter #(= (second %) ".Dim") assignments)
-        dims (nnth 2 (first dim-assgn))]
-    (v2m coll dims)))
+; PASS
+; combine data and model into final output
 
-(defmulti dpass4 first)
-(defmethod dpass4 :default [node] node)
-(defmethod dpass4 'assignment-list  [[_ assignments]]
-  (list 'let (vec (apply concat assignments))))
+(let [data-map
+      (->> (parse "grammars/R_data.g4" "examples/temp-data.R")
+           (walk-ast dpass1)
+           (walk-ast dpass2)
+           (walk-ast dpass3)
+           (map vec)
+           (into {}))
+      p4
+      (->> (parse "grammars/bugs.g4" "examples/temp")
+           (walk-ast pass1)
+           (walk-ast pass2)
+           (walk-ast prewalk (partial pass3 {:data data-map}))
+           pass4)
+  ; p4)
+      p5
+      (zv/visit (z/seq-zip p4)
+            {:data data-map :max-indexed-vars {}}
+            [keep-maximum-of-indexed-vars])
+      initiated-arrays
+      (initiate-nil-arrays (-> p5 :state :max-indexed-vars))])
+  
 
-(->> (parse "grammars/R_data.g4" "examples/dyes-data.R")
-     (walk-ast postwalk dpass1)
-     (walk-ast postwalk dpass2)
-     (walk-ast postwalk dpass3)
-     (walk-ast postwalk dpass4))
+(pst)
+
+
+(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data.R")
+     (walk-ast dpass1)
+     (walk-ast dpass2)
+     (walk-ast dpass3))
+
+(pst)
+
+(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/dyes/dyes-data.R")
+     (walk-ast dpass1)
+     (walk-ast dpass2)
+     (walk-ast dpass3)
+     (map vec)
+     (into {}))
+
+(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/bones/bones-data.R")
+     (walk-ast dpass1)
+     (walk-ast dpass2)
+     (walk-ast dpass3))
