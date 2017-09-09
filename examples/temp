@@ -1,0 +1,10 @@
+model
+{
+    for( i in 1 : N ) {
+        for( j in 1 : i ) {
+            r[i, j] ~ dnorm(i, b[j])
+            c[i, j] ~ dnorm(0, r[i, j])
+        }
+    }
+    a ~ dnorm(0, 1)
+}
