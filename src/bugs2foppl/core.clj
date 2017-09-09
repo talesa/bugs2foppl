@@ -259,7 +259,7 @@
 ;                  (derive 'deterministic-relation :relation)
 ;                  atom))
 ; (defmethod pass5 :default [context node]
-;   (apply concat (visit-children pass5 node context)))
+;   (apply concat (visit-children pass5 context node )))
 ;
 ; (defmethod pass5 :relation [context node]
 ;   (let [to-var (second (second node)) ; var name string
@@ -302,25 +302,67 @@
       (v2m (repeat (apply * lens) nil) lens)))
    max-indexed-vars))
 
-
-; (defvisitor collect-vars-binded :pre [n s]
-;   (if (= :relation (first n))
-;     (let [[_ var] n
-;           [_ var-symbol] var]
-;       {:state (assoc s :vars-bindings
-;                      (conj
-;                       (get s :vars-bindings)
-;                       var-symbol))})))
-
-
-
-; PASS
+; PASS 6
 ; create the dependency graph
 ;   easy for nonindexed relations
 ;   for indexed varaibles assignment set the name of the node to var_i_j or sth like that
+(defmulti pass6 (fn [context node] (first node))
+  :hierarchy (-> (make-hierarchy)
+                 (derive 'stochastic-relation :relation)
+                 (derive 'deterministic-relation :relation)
+                 (derive 'var :var)
+                 (derive 'var-indexed :var)
+                 atom))
+(defmethod pass6 :default [context node]
+  (apply concat (visit-children pass6 context node)))
+
+
+(defn combine-var-index [var-symbol var-index]
+  (symbol (str (str var-symbol) "_" (clojure.string/join "_" var-index))))
+
+(defmethod pass6 'stochastic-relation [context [_ [var-type to-var-symbol var-index] expr]]
+  (let [to-var-symbol (if (= var-type 'var)
+                          to-var-symbol
+                          (combine-var-index to-var-symbol var-index))
+        context (assoc context :to-var to-var-symbol)]
+    (pass6 context expr)))
+; TODO expr may be a number in deterministic-relation
+(defmethod pass6 'deterministic-relation [context [_ [var-type to-var-symbol var-index] expr]]
+  (if (not (number? expr))
+    (let [context (assoc context :to-var to-var-symbol)]
+      (pass6 context expr))
+    (list)))
+
+(defmethod pass6 'var [context [_ var-symbol]]
+  (list var-symbol (:to-var context)))
+(defmethod pass6 'var-indexed [context [_ var-symbol var-index]]
+  (list (combine-var-index var-symbol var-index) (:to-var context)))
+
+; PASS 7
+; get relations to map
+(defmulti pass7 (fn [node] (first node)))
+(defmethod pass7 :default [node]
+  (apply merge (visit-children pass7 node)))
+(defmethod pass7 'stochastic-relation [[_ [var-type to-var-symbol var-index] expr :as node]]
+  (let [to-var-symbol (if (= var-type 'var)
+                          to-var-symbol
+                          (combine-var-index to-var-symbol var-index))]
+    {to-var-symbol node}))
+(defmethod pass7 'deterministic-relation [[_ [var-type to-var-symbol var-index] expr :as node]]
+  (let [to-var-symbol (if (= var-type 'var)
+                          to-var-symbol
+                          (combine-var-index to-var-symbol var-index))]
+    {to-var-symbol node}))
+
+; TODO potentially control if the same variable is assigned multiple times or just assume correct BUGS input
 
 ; PASS
-; when changing the relations to actual binding pay attention to the fact whether the first argument is a var or a indexed var and act appropriately
+; resolve relations according to var/var-indexed
+; check whether var-indexed is nil and observe/sample appropriately
+
+; PASS
+; resolve var nodes
+; resolve var-indexed nodes checking if the value
 
 ; PASS
 ; combine data and model into final output
@@ -338,17 +380,27 @@
            (walk-ast pass2)
            (walk-ast prewalk (partial pass3 {:data data-map}))
            pass4)
-  ; p4)
       p5
       (zv/visit (z/seq-zip p4)
             {:data data-map :max-indexed-vars {}}
             [keep-maximum-of-indexed-vars])
-      initiated-arrays
-      (initiate-nil-arrays (-> p5 :state :max-indexed-vars))])
-  
+      data-map
+      (into data-map
+            (map vec
+                 (initiate-nil-arrays (-> p5 :state :max-indexed-vars))))
+      edges (filter (complement empty?) (map (partial pass6 {}) p4))
+      v2n (into {} (map pass7 p4))
+      g (apply digraph edges)
+      ; _ (view g)
+      nso (topsort g)
+      ; n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit {}) n))))
+      nodes (fn [v2n nso] (map (partial get v2n) nso))
+      ordered-rels (filter (complement empty?) (nodes v2n nso))]
+  ordered-rels)
+      ; output (map n2t (nodes v2n nso))]
+
 
 (pst)
-
 
 (->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data.R")
      (walk-ast dpass1)
@@ -368,3 +420,5 @@
      (walk-ast dpass1)
      (walk-ast dpass2)
      (walk-ast dpass3))
+
+(defn)

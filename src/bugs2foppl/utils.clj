@@ -60,6 +60,7 @@
         e (coerce/tree->sexpr m)]
     e))
 
+; TODO changed order of [context node]
 ; (defn visit-children
 ;   "Returns a sequence of visited children."
 ;   [visit-func node & context]
@@ -71,10 +72,11 @@
   "Returns a sequence of visited children."
   ([visit-func node]
    (map visit-func (filter node? (rest node))))
-  ([visit-func node context]
+  ([visit-func context node]
    (map visit-func
-        (filter node? (rest node))
-        (repeat context))))
+        (repeat context)
+        (filter node? (rest node)))))
+
 
 ; TODO possibly change to tail recursion?
 (defn find-nodes
@@ -126,19 +128,19 @@
     "logit"  'sigmoid))
 
 ; sub it with edges
-(defmulti get-graph-edges (fn [node context] (first node)))
-(defmethod get-graph-edges :default [node context]
-  (apply concat (visit-children get-graph-edges node context)))
+(defmulti get-graph-edges (fn [context node] (first node)))
+(defmethod get-graph-edges :default [context node]
+  (apply concat (visit-children get-graph-edges context node)))
 
-(defmethod get-graph-edges :stochasticRelation [node context]
+(defmethod get-graph-edges :stochasticRelation [context node]
   (let [to-var (second (second node)) ; var name string
         context (assoc context :to-var to-var)]
     (get-graph-edges (nth node 3) context)))
-(defmethod get-graph-edges :deterministicRelation1 [node context]
+(defmethod get-graph-edges :deterministicRelation1 [context node]
   (let [to-var (second (second node)) ; var name string
         context (assoc context :to-var to-var)]
     (get-graph-edges (nth node 3) context)))
-(defmethod get-graph-edges :varID [node context]
+(defmethod get-graph-edges :varID [context node]
   (list (list (second node) (:to-var context))))
 
 
