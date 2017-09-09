@@ -1,4 +1,4 @@
-(ns bugs2foppl.utils
+(ns bugs2foppl.core
   (require [zip.visit :as zv]
            [clojure.zip :as z]
            [foppl.desugar :refer :all]
@@ -10,8 +10,7 @@
        [loom.io :only (view)]
        [loom.alg :only (topsort)]
        [clojure.walk]
-       [clojure.repl]
-       [anglican runtime]))
+       [clojure.repl]))
       ;  :reload-all))
 
 ; helper functions
@@ -408,49 +407,43 @@
       (apply concat (map identity data-map))
       (apply concat relations)))))
 
-(let [input-file "examples/temp"
-      data-file "examples/temp2-data.R"
-      input-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds.bug"
-      data-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data.R"
-      data-file "examples/temp2-data.R"
-      data-map
-      (->> (parse "grammars/R_data.g4" data-file)
-           (walk-ast dpass1)
-           (walk-ast dpass2)
-           (walk-ast dpass3)
-           (map (fn [[f s]] (list f (if (seq? s) (vec s) s))))
-           (map vec)
-           (into {}))
-      p4
-      (->> (parse "grammars/bugs.g4" input-file)
-           (walk-ast pass1)
-           (walk-ast pass2)
-           (walk-ast prewalk (partial pass3 {:data data-map}))
-           pass4)
-      p5
-      (zv/visit (z/seq-zip p4)
-            {:data data-map :max-indexed-vars {}}
-            [keep-maximum-of-indexed-vars])
-      data-map
-      (into data-map
-            (map vec
-                 (initiate-nil-arrays (-> p5 :state :max-indexed-vars))))
-      edges (filter (complement empty?) (map (partial pass6 {}) p4))
-      ; TODO this is so ugly, fix it
-      edges (partition 2 (flatten edges))
-      v2n (into {} (map pass7 p4))
-      g (apply digraph edges)
-      ; _ (view g)
-      nso (topsort g)
-      nso (concat nso (clojure.set/difference (set (keys v2n)) (set nso)))
-      nodes (fn [v2n nso] (map (partial get v2n) nso))
-      ordered-rels1 (nodes v2n nso)
-      ordered-rels (filter (complement empty?) ordered-rels1)
-      p8 (map (partial pass8 data-map) ordered-rels)
-      p9 (map pass9 p8)
-      p10 (map (fn [[var expr]] (list var (walk-ast pass10 expr))) p9)
-      output (pass11 data-map p10)
-      foppl-ds (list 'foppl-query output)]
-  (eval foppl-ds))
-
-(pst)
+(defn translate-bugs-to-foppl [model-file data-file]
+  (let [data-map
+        (->> (parse "grammars/R_data.g4" data-file)
+             (walk-ast dpass1)
+             (walk-ast dpass2)
+             (walk-ast dpass3)
+             (map (fn [[f s]] (list f (if (seq? s) (vec s) s))))
+             (map vec)
+             (into {}))
+        p4
+        (->> (parse "grammars/bugs.g4" model-file)
+             (walk-ast pass1)
+             (walk-ast pass2)
+             (walk-ast prewalk (partial pass3 {:data data-map}))
+             pass4)
+        p5
+        (zv/visit (z/seq-zip p4)
+              {:data data-map :max-indexed-vars {}}
+              [keep-maximum-of-indexed-vars])
+        data-map
+        (into data-map
+              (map vec
+                   (initiate-nil-arrays (-> p5 :state :max-indexed-vars))))
+        edges (filter (complement empty?) (map (partial pass6 {}) p4))
+        ; TODO this is so ugly, fix it
+        edges (partition 2 (flatten edges))
+        v2n (into {} (map pass7 p4))
+        g (apply digraph edges)
+        ; _ (view g)
+        nso (topsort g)
+        nso (concat nso (clojure.set/difference (set (keys v2n)) (set nso)))
+        nodes (fn [v2n nso] (map (partial get v2n) nso))
+        ordered-rels1 (nodes v2n nso)
+        ordered-rels (filter (complement empty?) ordered-rels1)
+        p8 (map (partial pass8 data-map) ordered-rels)
+        p9 (map pass9 p8)
+        p10 (map (fn [[var expr]] (list var (walk-ast pass10 expr))) p9)
+        output (pass11 data-map p10)
+        foppl-ds (list 'foppl-query output)]
+    foppl-ds))
