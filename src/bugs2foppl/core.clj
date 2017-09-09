@@ -163,7 +163,7 @@
   (list 'deterministic-relation var expr))
 
 (defmethod pass1 :deterministicRelationLink [[_ link-fn _ var _ _ expr]]
-  (list 'deterministicRelation var (list 'inv-link-fn (symbol link-fn) expr)))
+  (list 'deterministic-relation var (list 'inv-link-fn (symbol link-fn) expr)))
 
 (defmethod pass1 :expressionList [node]
   (extract-seq-from-left-recursive-rule node))
@@ -329,7 +329,10 @@
 ; TODO expr may be a number in deterministic-relation
 (defmethod pass6 'deterministic-relation [context [_ [var-type to-var-symbol var-index] expr]]
   (if (not (number? expr))
-    (let [context (assoc context :to-var to-var-symbol)]
+    (let [to-var-symbol (if (= var-type 'var)
+                            to-var-symbol
+                            (combine-var-index to-var-symbol var-index))
+          context (assoc context :to-var to-var-symbol)]
       (pass6 context expr))
     (list)))
 
@@ -356,26 +359,75 @@
 
 ; TODO potentially control if the same variable is assigned multiple times or just assume correct BUGS input
 
-; PASS
+; PASS 8
 ; resolve relations according to var/var-indexed
 ; check whether var-indexed is nil and observe/sample appropriately
+(defn is-nil-in-data?
+  "Checks whether the var is nil given the data map. "
+  ([data var]
+   (let [[var-type var-symbol var-index] var]
+     (is-nil-in-data? data var-symbol var-index)))
+  ([data var-symbol var-index]
+   (let [var-index (map dec var-index)]
+     (nil? (if (nil? var-index)
+             (get data var-symbol)
+             (-> (get data var-symbol)
+                 (get-in var-index)))))))
+(defmulti pass8 (fn [data node] (first node)))
+(defmethod pass8 'stochastic-relation [data [_ var expr]]
+  (if (is-nil-in-data? data var)
+    (list var (list 'sample expr))
+    (list '_ (list 'observe expr var))))
+(defmethod pass8 'deterministic-relation [data [_ var expr]]
+  (list var expr))
 
-; PASS
+; TODO in pass8 I'm not keeping track of the new variables being assigned values so I'm taking into account the situation when a variable might be transformed using deterministic relationship and then it should be observed rather than sampled
+; TODO and possibly other situations as well
+; TODO at which point should I decrease the indeces of the var-indexed
+
+; PASS 9
+; resolve var-indexed nodes on the left hand side of the relation so that the expr on the right hand side would be assoced into appropriate position in the array
+(defn pass9 [[var expr :as node]]
+  (if (not (= '_ var))
+    (let [[var-type var-symbol var-index] var]
+      (if (= var-type 'var-indexed)
+        (list var-symbol (list 'assoc-in var-symbol (map dec var-index) expr))
+        (list var-symbol expr)))
+    node))
+
+; PASS 10
 ; resolve var nodes
-; resolve var-indexed nodes checking if the value
+; resolve var-indexed nodes
+(defmulti pass10 first)
+(defmethod pass10 :default [n] n)
+(defmethod pass10 'var [[_ var-symbol]] var-symbol)
+(defmethod pass10 'var-indexed [[_ var-symbol var-index]] (list 'get-in var-symbol var-index))
 
-; PASS
+; PASS 11
 ; combine data and model into final output
+(defn pass11 [data-map relations]
+  (list
+   'let
+    (vec
+     (concat
+      (apply concat (map identity data-map))
+      (apply concat relations)))))
 
-(let [data-map
-      (->> (parse "grammars/R_data.g4" "examples/temp-data.R")
+(let [input-file "examples/temp"
+      data-file "examples/temp2-data.R"
+      input-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds.bug"
+      data-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data.R"
+      data-file "examples/temp2-data.R"
+      data-map
+      (->> (parse "grammars/R_data.g4" data-file)
            (walk-ast dpass1)
            (walk-ast dpass2)
            (walk-ast dpass3)
+           (map (fn [[f s]] (list f (if (seq? s) (vec s) s))))
            (map vec)
            (into {}))
       p4
-      (->> (parse "grammars/bugs.g4" "examples/temp")
+      (->> (parse "grammars/bugs.g4" input-file)
            (walk-ast pass1)
            (walk-ast pass2)
            (walk-ast prewalk (partial pass3 {:data data-map}))
@@ -389,36 +441,21 @@
             (map vec
                  (initiate-nil-arrays (-> p5 :state :max-indexed-vars))))
       edges (filter (complement empty?) (map (partial pass6 {}) p4))
+      ; TODO this is so ugly, fix it
+      edges (partition 2 (flatten edges))
       v2n (into {} (map pass7 p4))
       g (apply digraph edges)
       ; _ (view g)
       nso (topsort g)
-      ; n2t (fn [n] (clojure.string/join " " (flatten (walk-ast postwalk (partial translate-node-visit {}) n))))
+      nso (concat nso (clojure.set/difference (set (keys v2n)) (set nso)))
       nodes (fn [v2n nso] (map (partial get v2n) nso))
-      ordered-rels (filter (complement empty?) (nodes v2n nso))]
-  ordered-rels)
-      ; output (map n2t (nodes v2n nso))]
+      ordered-rels1 (nodes v2n nso)
+      ordered-rels (filter (complement empty?) ordered-rels1)
+      p8 (map (partial pass8 data-map) ordered-rels)
+      p9 (map pass9 p8)
+      p10 (map (fn [[var expr]] (list var (walk-ast pass10 expr))) p9)
+      output (pass11 data-map p10)]
+  output)
 
 
 (pst)
-
-(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data.R")
-     (walk-ast dpass1)
-     (walk-ast dpass2)
-     (walk-ast dpass3))
-
-(pst)
-
-(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/dyes/dyes-data.R")
-     (walk-ast dpass1)
-     (walk-ast dpass2)
-     (walk-ast dpass3)
-     (map vec)
-     (into {}))
-
-(->> (parse "grammars/R_data.g4" "examples/examples_JAGS/classic-bugs/vol1/bones/bones-data.R")
-     (walk-ast dpass1)
-     (walk-ast dpass2)
-     (walk-ast dpass3))
-
-(defn)

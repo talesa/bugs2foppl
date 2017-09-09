@@ -163,7 +163,6 @@
 (defmethod translate-node-visit :stochasticRelation [data node]
   (let [var-str (second (find-first :varID (nth node 1)))
         var-str (nth node 1)] ; these 2 should be equivalent
-    (pprint var-str)
     (if (contains? data var-str)
       (list "(observe" (nth node 3) (get data var-str) ")")
       (list var-str "(sample" (nth node 3) ")"))))
