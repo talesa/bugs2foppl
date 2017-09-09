@@ -1,4 +1,4 @@
-grammar bugs_data;
+grammar R_data;
 
 input: varAssignmentList;
 
