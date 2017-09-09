@@ -5,7 +5,9 @@
            [clojure.java.io :as io]
            [zip.visit :as zv]
            [clojure.zip :as z]
-           [clojure.xml :as xml])
+           [clojure.xml :as xml]
+           [foppl.desugar :refer :all]
+           [foppl.core :as foppl :refer [foppl-query print-graph]] :reload)
           ;  :reload-all)
   (use [bugs2foppl.utils]
        [clojure.pprint :only [pprint]]
@@ -15,6 +17,7 @@
        [loom.alg :only (topsort)]
        [clojure.walk]
        [clojure.repl]
+       [anglican runtime]
       ;  [zip.visit]
       ;  [clojure.zip]
        :reload-all))
@@ -391,7 +394,7 @@
   (if (not (= '_ var))
     (let [[var-type var-symbol var-index] var]
       (if (= var-type 'var-indexed)
-        (list var-symbol (list 'assoc-in var-symbol (map dec var-index) expr))
+        (list var-symbol (list 'assoc-in var-symbol (vec (map dec var-index)) expr))
         (list var-symbol expr)))
     node))
 
@@ -454,8 +457,8 @@
       p8 (map (partial pass8 data-map) ordered-rels)
       p9 (map pass9 p8)
       p10 (map (fn [[var expr]] (list var (walk-ast pass10 expr))) p9)
-      output (pass11 data-map p10)]
-  output)
-
+      output (pass11 data-map p10)
+      foppl-ds (list 'foppl-query output)]
+  (eval foppl-ds))
 
 (pst)
