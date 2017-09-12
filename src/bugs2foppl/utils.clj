@@ -1,7 +1,8 @@
 (ns bugs2foppl.utils
   (require [clj-antlr.coerce :as coerce]
            [clj-antlr.interpreted :as interpreted]
-           [clojure.java.io :as io])
+           [clojure.java.io :as io]
+           [rhizome.viz])
   (use [clojure.pprint :only [pprint]]
        [clojure.walk]))
 
@@ -148,3 +149,25 @@
                (catch Exception e false))]
       (if output output %))
    node))
+
+(defn node->descriptor [G n]
+  (let [[V A P O] G
+        body (print-str (-> P n :body))
+        label (str n ": " body)
+        descriptor (if (contains? O n)
+                     {:label (list label (-> O n :value))
+                      :fillcolor "gray"
+                      :style "filled"}
+                     {:label label})]
+     descriptor))
+
+(defn rhizome-helper [G]
+  (let [[V A P O] G
+        adj-list (into {} (map (fn [[k v]] [k (map #(second %) v)]) (group-by first A)))]
+    [V adj-list :node->descriptor (partial node->descriptor G)]))
+
+(defn plot-foppl-graph [G] (apply rhizome.viz/view-graph (rhizome-helper G)))
+
+(defn save-foppl-graph [G output-svg-file]
+  (spit output-svg-file
+    (apply rhizome.viz/graph->svg (rhizome-helper G))))

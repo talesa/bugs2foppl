@@ -96,6 +96,7 @@
 (defmethod pass1 :varIndexed
   [[_ name _ range-list]]
   (list 'var-indexed (symbol (sanitize-var-name name)) range-list))
+; TODO possibly decrease the indeces above
 (defmethod pass1 :stochasticRelation
   [[_ var _ distribution & t-or-i]]
   (if (empty? t-or-i)
@@ -206,7 +207,7 @@
   (apply list (cons (foppl-fn-for name) params)))
 
 (defmethod pass2 'inv-link-fn [[_ name expr]]
-  (apply list (cons (foppl-inv-link-fn-for name) expr)))
+  (apply list (cons (foppl-inv-link-fn-for name) (list expr))))
 
 ; PASS 3
 ; fill in the values of the var nodes (not var-indexed) where this is necessary to evaluate the ranges for the loop
@@ -375,8 +376,8 @@
 (defmethod pass8 'deterministic-relation [data [_ var expr]]
   (list var expr))
 
-; TODO in pass8 I'm not keeping track of the new variables being assigned values so I'm taking into account the situation when a variable might be transformed using deterministic relationship and then it should be observed rather than sampled
-; TODO and possibly other situations as well
+; TODO in pass8 I'm not keeping track of the new variables being assigned values so I'm taking into account the situation when a variable might be transformed using deterministic relationship and then it should be observed rather than sampled and possibly other situations as well)
+
 ; TODO at which point should I decrease the indeces of the var-indexed
 
 ; PASS 9
@@ -395,7 +396,7 @@
 (defmulti pass10 first)
 (defmethod pass10 :default [n] n)
 (defmethod pass10 'var [[_ var-symbol]] var-symbol)
-(defmethod pass10 'var-indexed [[_ var-symbol var-index]] (list 'get-in var-symbol var-index))
+(defmethod pass10 'var-indexed [[_ var-symbol var-index]] (list 'get-in var-symbol (vec (map dec var-index))))
 
 ; PASS 11
 ; combine data and model into final output
