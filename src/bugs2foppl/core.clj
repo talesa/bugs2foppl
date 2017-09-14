@@ -191,6 +191,24 @@
 ; PASS 2
 ; substitutes the names of the functions, distributions and inverse link functions; changes the order and the parameterization of the arguments of the functions where necessary
 
+(defn foppl-distr-for [distr]
+  (case (str distr)
+    "dnorm"   'normal
+    "dgamma"  'gamma
+    "dunif"   'uniform-continuous
+    "dbin"    'binomial))
+
+(defn foppl-fn-for [func]
+  (case (str func)
+    "sqrt"   'sqrt))
+
+(defn foppl-inv-link-fn-for [func]
+  (case (str func)
+    "logit" '(fn [e] (/ 1. (+ 1. (Math/exp (- e)))))
+    "log" 'Math/exp
+    "cloglog" '(fn [e] (Math/log (- (Math/log (- 1. e)))))
+    "probit" '(partial incanter.distributions/cdf (incanter.distributions/normal-distribution))))
+
 (defmulti pass2 first)
 (defmethod pass2 :default [n] n)
 

@@ -28,13 +28,6 @@
   (let [magnitude (sum v)]
     (vec (map (partial * (/ 1. magnitude)) v))))
 
-(defn inv-link-fn [link-fn]
-  (case link-fn
-    "logit" '(fn [e] (/ 1. (+ 1. (Math/exp (- e)))))
-    "log" 'Math/exp
-    "cloglog" '(fn [e] (Math/log (- (Math/log (- 1. e)))))
-    "probit" '(partial incanter.distributions/cdf (incanter.distributions/normal-distribution))))
-
 (defn v2m
   "Forms an nested vector array of dimensions dims from a vector coll."
   [coll lens]
@@ -112,21 +105,6 @@
     (apply merge data (flatten (map f1 seqs)))))
 
 (defn sanitize-var-name [var-name] (clojure.string/replace var-name "." "-"))
-
-(defn foppl-distr-for [distr]
-  (case (str distr)
-    "dnorm"   'normal
-    "dgamma"  'gamma
-    "dunif"   'uniform-continuous
-    "dbin"    'binomial))
-
-(defn foppl-fn-for [func]
-  (case (str func)
-    "sqrt"   'sqrt))
-
-(defn foppl-inv-link-fn-for [func]
-  (case (str func)
-    "logit"  'sigmoid))
 
 (defn text [node] (walk-ast postwalk (fn [node] (clojure.string/join " " (rest node))) node))
 
