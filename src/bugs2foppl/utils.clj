@@ -19,7 +19,8 @@
     (= b nil) a
     (every? coll? [a b]) (vec (map max a b))))
 
-(defn sum [coll] (reduce + coll))
+(defn sum [coll] (reduce + (flatten coll)))
+(defn mean [coll] (let [flat-coll (flatten coll)] (/ (reduce + flat-coll) (count flat-coll))))
 
 (defn normalize
   "Normalizes a vector."
@@ -170,3 +171,9 @@
 (defn save-foppl-graph [G output-svg-file]
   (spit output-svg-file
     (apply rhizome.viz/graph->svg (rhizome-helper G))))
+
+(defn not-supported [feature] (throw (Exception. (str (str feature) " is not supported yet."))))
+
+(defn asinh [e] (Math/log (+ e (Math/sqrt (+ (* e e) 1)))))
+(defn acosh [e] (Math/log (+ e (Math/sqrt (- (* e e) 1)))))
+(defn atanh [e] (* 0.5 (Math/log (/ (+ 1 e) (- 1 e)))))

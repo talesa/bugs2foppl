@@ -189,7 +189,6 @@
 ; PASS 2
 ; substitutes the names of the functions, distributions and inverse link functions; changes the order and the parameterization of the arguments of the functions where necessary
 
-(defn foppl-distr-not-supported [distr] (throw (Exception. (str (str distr) " is not supported yet."))))
 (defn foppl-distr-for [distr params]
   (case (str distr)
     ; discrete
@@ -200,49 +199,115 @@
                                     (list (inc i) (nnth i %)))
                                 (normalize p))]
                 (list 'categorical pairs))
-    "dnegbin" (foppl-distr-not-supported distr)
+    "dnegbin" (not-supported distr)
     "dpois"   (let [[lambda] params] (list 'poisson lambda))
-    "dgeom"   (foppl-distr-not-supported distr)
-    "dgeom0"  (foppl-distr-not-supported distr)
-    "dhyper"  (foppl-distr-not-supported distr)
+    "dgeom"   (not-supported distr)
+    "dgeom0"  (not-supported distr)
+    "dhyper"  (not-supported distr)
     ; continuous
     "dbeta"   (let [[a b] params] (list 'beta a b))
-    "dchisqr" (foppl-distr-not-supported distr)
-    "ddexp"   (foppl-distr-not-supported distr)
+    "dchisqr" (not-supported distr)
+    "ddexp"   (not-supported distr)
     "dexp"    (let [[lambda] params] (list 'exponential lambda))
-    "dflat"   (foppl-distr-not-supported distr)
+    "dflat"   (not-supported distr)
     "dgamma"  (let [[r mu] params
                     [a b] [r mu]]
                 (list 'gamma a b))
-    "dgev"    (foppl-distr-not-supported distr)
-    "df"      (foppl-distr-not-supported distr)
-    "dggamma" (foppl-distr-not-supported distr)
-    "dgpar"   (foppl-distr-not-supported distr)
-    "dloglik" (foppl-distr-not-supported distr)
-    "dlnorm"  (foppl-distr-not-supported distr)
-    "dlogis"  (foppl-distr-not-supported distr)
+    "dgev"    (not-supported distr)
+    "df"      (not-supported distr)
+    "dggamma" (not-supported distr)
+    "dgpar"   (not-supported distr)
+    "dloglik" (not-supported distr)
+    "dlnorm"  (not-supported distr)
+    "dlogis"  (not-supported distr)
     "dnorm"   (let [[mean tau] params
                     std (list '#(Math/sqrt (/ 1 %)) tau)]
                 (list 'normal mean std))
-    "dpar"    (foppl-distr-not-supported distr)
+    "dpar"    (not-supported distr)
     "dunif"   (let [[a b] params] (list 'uniform-continuous a b))
-    "dweib"   (foppl-distr-not-supported distr)
+    "dweib"   (not-supported distr)
     ; discrete multivariate
-    "dmulti"  (foppl-distr-not-supported distr)
+    "dmulti"  (not-supported distr)
     ; continuous multivariate
     "ddirich" (let [[alpha] params] (list 'dirichlet alpha))
     "ddirch"  (foppl-distr-for "ddirich" params)
     "dmnorm"  (let [[mu T] params
                     cov (clojure.core.matrix/inverse T)]
                 (list 'mvn mu cov))
-    "dmt"     (foppl-distr-not-supported distr)
+    "dmt"     (not-supported distr)
     "dwish"   (let [[R k] params
                     [V n] [R k]]
                 (list 'wishart n V))))
 
 (defn foppl-fn-for [func]
   (case (str func)
-    "sqrt"   'Math/sqrt))
+    "abs"         'Math/abs
+    "arccos"      'Math/acos
+    "arccosh"     '(fn [e] (Math/log (+ e (Math/sqrt (- (* e e) 1)))))
+    "arcsin"      'Math/asin
+    "arcsinh"     '(fn [e] (Math/log (+ e (Math/sqrt (+ (* e e) 1)))))
+    "arctan"      'Math/atan
+    "arctanh"     '(fn [e] (* 0.5 (Math/log (/ (+ 1 e) (- 1 e)))))
+    "cloglog"     '(fn [e] (Math/log (- (Math/log (- 1. e)))))
+    "cos"         'Math/cos
+    "cosh"        'Math/cosh
+    "cumulative"  (not-supported func)
+    "cut"         (not-supported func)
+    "density"     (not-supported func)
+    "deviance"    (not-supported func)
+    "equals"      '(fn [e1 e2] (if (= e1 e2) 1 0))
+    "exp"         'Math/exp
+    "gammap"      (not-supported func)
+    "ilogit"      '(fn [e] (/ (Math/exp e) (+ 1 (Math/exp e))))
+    "icloglog"    '(fn [e] (- 1 (Math/exp (- (Math/exp e)))))
+    "integral"    (not-supported func)
+    "log"         'Math/log
+    "logfact"     '(fn [e] (Math/log (reduce * (range 1 (inc e))))) ; TODO super inefficient
+    "loggam"      (not-supported func)
+    "logit"       '(fn [e] (Math/log (/ e (- 1 e))))
+    "max"         'max
+    "min"         'min
+    "phi"         '(partial incanter.distributions/cdf (incanter.distributions/normal-distribution))
+    "post.p.value"    (not-supported func)
+    "pow"             'Math/pow
+    "prior.p.value"   (not-supported func)
+    "probit"          (not-supported func) ; TODO implement probit
+    "replicate.post"  (not-supported func)
+    "replicate.prior" (not-supported func)
+    "round"       'Math/round
+    "sin"         'Math/sin
+    "sinh"        'Math/sinh
+    "solution"    (not-supported func)
+    "sqrt"        'Math/sqrt
+    "step"        '(fn [e] (if (>= e 0) 1 0))
+    "tan"         'Math/tan
+    "tanh"        'Math/tanh
+    "trunc"       'Math/floor
+    ; vector functions
+    "inprod"      '(fn [v1 v2] (reduce + (map * v1 v2)))
+    "interp.lin"  '(fn [e v1 v2]
+                     (let [data (into {} (map vector (map float v1) (map float v2)))
+                           v1p (Math/floor e)
+                           v1p1 (Math/ceil e)
+                           v2p (get data v1p)
+                           v2p1 (get data v1p1)]
+                       (+ v2p (/ (* (- v2p1 v2p) (- e v1p)) (- v1p1 v1p)))))
+    "inverse"     'clojure.core.matrix/inverse
+    "logdet"      '(fn [v] (Math/log (clojure.core.matrix/det v)))
+    "mean"        '(fn [v] (let [flat-coll (flatten v)] (/ (reduce + flat-coll) (count flat-coll))))
+    "eigen.vals"  '(fn [v] (vec (:rA (clojure.core.matrix.linear/eigen v))))
+    "ode"         (not-supported func)
+    "prod"        '(partial reduce *)
+    "p.valueM"    (not-supported func)
+    "rank"        '(fn [v s] (reduce + (map (fn [vv ss] (if (<= vv ss) 1 0)) v s)))
+    "ranked"      '(fn [v s] (nnth (dec s) (sort v)))
+    "replicate.postM" (not-supported func)
+    "sd"          '(fn [v]
+                     (let [flat-coll (flatten v)
+                           mu (/ (reduce + flat-coll) (count flat-coll))]
+                       (/ (reduce + (map #(* % %) (map - flat-coll (repeat mu)))) (dec (count v)))))
+    "sort"        'sort
+    "sum"         '(fn [v] (reduce + (flatten v)))))
 
 (defn foppl-inv-link-fn-for [func]
   (case (str func)
