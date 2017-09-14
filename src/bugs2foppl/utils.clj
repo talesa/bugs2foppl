@@ -2,20 +2,38 @@
   (require [clj-antlr.coerce :as coerce]
            [clj-antlr.interpreted :as interpreted]
            [clojure.java.io :as io]
-           [rhizome.viz])
+           [clojure.repl :refer [pst]]
+           [rhizome.viz]
+           [incanter distributions])
   (use [clojure.pprint :only [pprint]]
        [clojure.walk]))
 
 (defn count1? [coll] (= 1 (count coll)))
 
 (defn vec-max
-  "Element-wise vector max function."
+  "Max function which can perform element-wise vector max and handles nil arguments."
   [a b]
-  (if (= a nil)
-    b
-    (if (= b nil)
-      a
-      (vec (map max a b)))))
+  (cond
+    (every? number? [a b]) (clojure.core/max a b)
+    (= a nil) b
+    (= b nil) a
+    (every? coll? [a b]) (vec (map max a b))))
+
+(defn sum [coll] (reduce + coll))
+
+(defn normalize
+  "Normalizes a vector."
+  [v]
+  {:pre [(every? number? v)]}
+  (let [magnitude (sum v)]
+    (vec (map (partial * (/ 1. magnitude)) v))))
+
+(defn inv-link-fn [link-fn]
+  (case link-fn
+    "logit" '(fn [e] (/ 1. (+ 1. (Math/exp (- e)))))
+    "log" 'Math/exp
+    "cloglog" '(fn [e] (Math/log (- (Math/log (- 1. e)))))
+    "probit" '(partial incanter.distributions/cdf (incanter.distributions/normal-distribution))))
 
 (defn v2m
   "Forms an nested vector array of dimensions dims from a vector coll."

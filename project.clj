@@ -9,6 +9,7 @@
                  [foppl "0.1.0-SNAPSHOT"]
                  [anglican "1.0.0"]
                  [zip-visit "1.1.0"]
-                 [rhizome "0.2.9"]]
+                 [rhizome "0.2.9"]
+                 [incanter/incanter-core "1.5.7"]]
   :repositories [["anglican" "https://anglican.s3-eu-west-1.amazonaws.com/"]]
   :jvm-opts ["-Xmx6g" "-Xms4g" "-XX:-OmitStackTraceInFastThrow"])

@@ -17,11 +17,6 @@
 
 (defn node-type [n] (first n))
 
-(defn sigmoid [x] (/ 1. (+ 1. (Math/exp (- x)))))
-(defn inv-link-fn [link-fn]
-  (case link-fn
-    "logit" 'sigmoid))
-
 (defn extract-seq-from-left-recursive-rule
   "Returns a sequence from right recursive rules with a comma in the form r: n | r ',' n;"
   ([node] (extract-seq-from-left-recursive-rule node :comma))
@@ -245,23 +240,6 @@
   (apply concat (visit-children pass4 node)))
 (defmethod pass4 'stochastic-relation [node] (list node))
 (defmethod pass4 'deterministic-relation [node] (list node))
-
-
-; (defmulti pass5
-;   (fn [context node] (first node))
-;   :hierarchy (-> (make-hierarchy)
-;                  (derive 'stochastic-relation :relation)
-;                  (derive 'deterministic-relation :relation)
-;                  atom))
-; (defmethod pass5 :default [context node]
-;   (apply concat (visit-children pass5 context node )))
-;
-; (defmethod pass5 :relation [context node]
-;   (let [to-var (second (second node)) ; var name string
-;         context (assoc context :to-var to-var)]
-;     (pass5 (nth node 3) context)))
-; (defmethod pass5 :varID [context node]
-;   (list (list (second node) (:to-var context))))
 
 ; PASS 5
 ; keep track of:
