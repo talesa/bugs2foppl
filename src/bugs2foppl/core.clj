@@ -186,21 +186,51 @@
 
 (defmethod pass1 :relation [[_ relation]] relation)
 
-
-
 ; PASS 2
 ; substitutes the names of the functions, distributions and inverse link functions; changes the order and the parameterization of the arguments of the functions where necessary
 
-(defn foppl-distr-for [distr]
+(defn foppl-distr-not-supported [distr] (throw (Exception. (str (str distr) " is not supported yet."))))
+(defn foppl-distr-for [distr params]
   (case (str distr)
-    "dnorm"   'normal
-    "dgamma"  'gamma
-    "dunif"   'uniform-continuous
-    "dbin"    'binomial))
+    ; discrete
+    "dbern"   (let [[p] params] (list 'bernoulli p))
+    "dbin"    (let [[p n] params] (list 'binomial n p))
+    "dcat"    (let [[p] params
+                    pairs (list '#(for [i (range (count %))]
+                                    (list (inc i) (nnth i %)))
+                                p)]
+                (list 'categorical pairs))
+    "dnegbin" (foppl-distr-not-supported distr)
+    "dpois"   (let [[lambda] params] (list 'poisson lambda))
+    "dgeom"   (foppl-distr-not-supported distr)
+    "dgeom0"  (foppl-distr-not-supported distr)
+    "dhyper"  (foppl-distr-not-supported distr)
+    ; continuous
+    "dbeta"   (let [[a b] params] (list 'beta a b))
+    "dchisqr" (foppl-distr-not-supported distr)
+    "ddexp"   (foppl-distr-not-supported distr)
+    "dexp"    (let [[lambda] params] (list 'exponential lambda))
+    "dflat"   (foppl-distr-not-supported distr)
+    "dgamma"  (let [[r mu] params
+                    [a b] [r mu]]
+                (list 'gamma a b))
+    "dgev"    (foppl-distr-not-supported distr)
+    "df"      (foppl-distr-not-supported distr)
+    "dggamma" (foppl-distr-not-supported distr)
+    "dgpar"   (foppl-distr-not-supported distr)
+    "dloglik" (foppl-distr-not-supported distr)
+    "dlnorm"  (foppl-distr-not-supported distr)
+    "dlogis"  (foppl-distr-not-supported distr)
+    "dnorm"   (let [[mean tau] params
+                    std (list '#(Math/sqrt (/ 1 %)) tau)]
+                (list 'normal mean std))
+    "dpar"    (foppl-distr-not-supported distr)
+    "dunif"   (let [[a b] params] (list 'uniform-continuous a b))
+    "dweib"   (foppl-distr-not-supported distr)))
 
 (defn foppl-fn-for [func]
   (case (str func)
-    "sqrt"   'sqrt))
+    "sqrt"   'Math/sqrt))
 
 (defn foppl-inv-link-fn-for [func]
   (case (str func)
@@ -214,7 +244,7 @@
 
 ; TODO some distributions and functions may need to have the order of arguments or parameterization of arguments
 (defmethod pass2 'distribution [[_ name & params]]
-  (apply list (cons (foppl-distr-for name) params)))
+  (foppl-distr-for name params))
 
 (defmethod pass2 'function [[_ name & params]]
   (apply list (cons (foppl-fn-for name) params)))

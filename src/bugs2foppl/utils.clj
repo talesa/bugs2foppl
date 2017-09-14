@@ -94,7 +94,10 @@
 
 (defn unsugar-var [var-name-str index] (str var-name-str "_" index))
 
-(defn nnth [index coll] (nth coll index))
+(defn nnth
+  "Returns the value at the index of coll."
+  [index coll]
+  (nth coll index))
 
 (defn unroll-data [data]
   ; there might be some obscure side effects with seq? here such as breaking down strings into sequences of chars
