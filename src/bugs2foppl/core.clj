@@ -198,7 +198,7 @@
     "dcat"    (let [[p] params
                     pairs (list '#(for [i (range (count %))]
                                     (list (inc i) (nnth i %)))
-                                p)]
+                                (normalize p))]
                 (list 'categorical pairs))
     "dnegbin" (foppl-distr-not-supported distr)
     "dpois"   (let [[lambda] params] (list 'poisson lambda))
@@ -226,7 +226,19 @@
                 (list 'normal mean std))
     "dpar"    (foppl-distr-not-supported distr)
     "dunif"   (let [[a b] params] (list 'uniform-continuous a b))
-    "dweib"   (foppl-distr-not-supported distr)))
+    "dweib"   (foppl-distr-not-supported distr)
+    ; discrete multivariate
+    "dmulti"  (foppl-distr-not-supported distr)
+    ; continuous multivariate
+    "ddirich" (let [[alpha] params] (list 'dirichlet alpha))
+    "ddirch"  (foppl-distr-for "ddirich" params)
+    "dmnorm"  (let [[mu T] params
+                    cov (clojure.core.matrix/inverse T)]
+                (list 'mvn mu cov))
+    "dmt"     (foppl-distr-not-supported distr)
+    "dwish"   (let [[R k] params
+                    [V n] [R k]]
+                (list 'wishart n V))))
 
 (defn foppl-fn-for [func]
   (case (str func)
