@@ -149,9 +149,11 @@ IN: 'in';
 /* Special operators, e.g. %*% for matrix multiplication */
 SPECIAL: '%'+[^% \t\r\n]*'%';
 
+ID: [a-zA-Z] [a-zA-Z0-9._]*;
+
 EXPONENT:   [eE][+-]?[0-9]+;
 DOUBLE: ([0-9]+) EXPONENT?
 | ([0-9]+'.'[0-9]*) EXPONENT?
 | ('.'[0-9]+) EXPONENT?;
 
-ID: [a-zA-Z] [a-zA-Z0-9._]*;
+
