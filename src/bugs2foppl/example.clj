@@ -12,10 +12,3 @@
       foppl-model (translate-bugs-to-foppl model-file data-file)
       [G E] (eval foppl-model)]
   foppl-model)
-
-(let [model-file "examples/examples_JAGS/classic-bugs/vol2/eyes/eyes2.bug"
-      data-file "examples/examples_JAGS/classic-bugs/vol2/eyes/eyes-data-short.R"
-      output-svg-file "examples/svg-output.svg"
-      foppl-model (translate-bugs-to-foppl model-file data-file)
-      [G E] (eval foppl-model)]
-  foppl-model)
