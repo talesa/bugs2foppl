@@ -121,29 +121,6 @@
        (defmethod ~name ~type [m#] (~body m#))
        ~name)))
 
-(defn sub-var
-  [bindings-map node]
-  (walk-ast
-   (node-traversal-method 'var
-    #(let [var (second %)]
-       (if (contains? bindings-map var)
-           (get bindings-map var)
-           %)))
-   node))
-
-(defn sub-range
-  "Substitutes ranges of (range-inclusive min max) to (range min (inc max)).
-   Assumes that expressions are already evaluated to numbers, otherwise returns original node."
-  [node]
-  (walk-ast
-   (node-traversal-method 'range-inclusive
-    #(let [min (nnth 1 %)
-           max (nnth 2 %)]
-       (if (and (number? min) (number? max))
-           (range min (inc max))
-           %)))
-   node))
-
 (defn partial-eval
   [node]
   (walk-ast

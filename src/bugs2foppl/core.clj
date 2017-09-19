@@ -27,6 +27,42 @@
          (conj (nth node 1) (nth node n))
          (vector (second node))))))
 
+(defn sub-var
+  [bindings-map node]
+  (walk-ast
+   (node-traversal-method 'var
+    #(let [var (second %)]
+       (if (contains? bindings-map var)
+           (get bindings-map var)
+           %)))
+   node))
+
+(defn sub-range
+  "Substitutes ranges of (range-inclusive min max) to (range min (inc max)).
+   Assumes that expressions are already evaluated to numbers, otherwise returns original node."
+  [node]
+  (walk-ast
+   (node-traversal-method 'range-inclusive
+    #(let [min (nnth 1 %)
+           max (nnth 2 %)]
+       (if (and (number? min) (number? max))
+           (range min (inc max))
+           %)))
+   node))
+
+(defn eval-var-indeces
+  [bindings-map node]
+  (walk-ast
+   (node-traversal-method
+    'var-indexed
+    (fn [n]
+      (let [[_ var-symbol var-index] n]
+        (list 'var-indexed var-symbol
+              (vec (->> var-index
+                        (map (partial sub-var bindings-map))
+                        (map partial-eval)))))))
+   node))
+
 ; DATA PASS 1
 (defmulti dpass1 first)
 (defmethod dpass1 :default [node] node)
@@ -221,7 +257,7 @@
     "dlnorm"  (not-supported distr)
     "dlogis"  (not-supported distr)
     "dnorm"   (let [[mean tau] params
-                    std (list '#(Math/sqrt (/ 1 %)) tau)]
+                    std (list '(fn [e] (Math/sqrt (/ 1 e))) tau)]
                 (list 'normal mean std))
     "dpar"    (not-supported distr)
     "dunif"   (let [[a b] params] (list 'uniform-continuous a b))
@@ -379,8 +415,11 @@
        (= (-> n second first) 'var-indexed))
     (let [[_ var] n
           [_ var-symbol var-index] var
-          max-indexed-vars (:max-indexed-vars s)
-          data (:data s)]
+          data (:data s)
+          ; var-index (->> var-index
+          ;                (map (partial sub-var data))
+          ;                (map partial-eval))
+          max-indexed-vars (:max-indexed-vars s)]
       (if (not (contains? (set (keys data)) var-symbol))
         (if (some (partial = :all) var-index)
           (throw (Exception. "Do not know how to handle :all in keep-maximum-of-indexed-vars."))
@@ -530,6 +569,8 @@
       (apply concat (map identity data-map))
       (apply concat relations)))))
 
+
+
 (defn translate-bugs-to-foppl [model-file data-file]
   (let [data-map
         (->> (parse "grammars/R_data.g4" data-file)
@@ -546,7 +587,7 @@
              (walk-ast prewalk (partial pass3 {:data data-map}))
              pass4)
         p4
-        (map partial-eval (map (partial sub-var data-map) p4))
+        (eval-var-indeces data-map p4)
         p5
         (zv/visit (z/seq-zip p4)
               {:data data-map :max-indexed-vars {}}
@@ -560,7 +601,7 @@
         edges (partition 2 (flatten edges))
         v2n (into {} (map pass7 p4))
         g (apply digraph edges)
-        ; _ (view g)
+        ; ; _ (view g)
         nso (topsort g)
         nso (concat nso (clojure.set/difference (set (keys v2n)) (set nso)))
         nodes (fn [v2n nso] (map (partial get v2n) nso))
@@ -575,7 +616,10 @@
         foppl-ds (list 'foppl-query output)]
     foppl-ds))
 
-; (let [data-file "examples/temp-data.R"
-;       model-file "examples/temp.bug"]
-;   (translate-bugs-to-foppl model-file data-file))
+(let [data-file "examples/temp-data.R"
+      model-file "examples/temp.bug"]
+  (translate-bugs-to-foppl model-file data-file))
+
 ;TODO think about where do you actually have to sub-var and partial-eval nodes
+;TODO go through the script thinking at which point you're using particular expressions and always try to sub-var and partial-eval before
+;TODO T[Z[i]] - this may need some modifications in
