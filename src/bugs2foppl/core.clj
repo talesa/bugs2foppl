@@ -2,7 +2,8 @@
   (require [zip.visit :as zv]
            [clojure.zip :as z]
            [foppl.desugar :refer :all]
-           [foppl.core :as foppl :refer [foppl-query print-graph]] :reload)
+           [foppl.core :as foppl :refer [foppl-query print-graph]] :reload
+           [clojure.math.combinatorics :as combo])
   (use [bugs2foppl.utils]
        [clojure.pprint :only [pprint]]
        [clojure.inspector :only (inspect-tree)]
@@ -91,7 +92,6 @@
 (defmethod pass1 :varIndexed
   [[_ name _ range-list]]
   (list 'var-indexed (symbol (sanitize-var-name name)) range-list))
-; TODO possibly decrease the indeces above
 (defmethod pass1 :stochasticRelation
   [[_ var _ distribution & t-or-i]]
   (if (empty? t-or-i)
@@ -319,7 +319,6 @@
 (defmulti pass2 first)
 (defmethod pass2 :default [n] n)
 
-; TODO some distributions and functions may need to have the order of arguments or parameterization of arguments
 (defmethod pass2 'distribution [[_ name & params]]
   (foppl-distr-for name params))
 
@@ -396,7 +395,6 @@
    (fn [[var-symbol lens]]
      (list
       var-symbol
-      ; TODO possibly may need to add vec here
       (v2m (repeat (apply * lens) nil) lens)))
    max-indexed-vars))
 
@@ -424,7 +422,7 @@
                           (combine-var-index to-var-symbol var-index))
         context (assoc context :to-var to-var-symbol)]
     (pass6 context expr)))
-; TODO expr may be a number in deterministic-relation
+
 (defmethod pass6 'deterministic-relation [context [_ [var-type to-var-symbol var-index] expr]]
   (if (not (number? expr))
     (let [to-var-symbol (if (= var-type 'var)
@@ -433,7 +431,6 @@
           context (assoc context :to-var to-var-symbol)]
       (pass6 context expr))
     (list)))
-
 (defmethod pass6 'var [context [_ var-symbol]]
   (list var-symbol (:to-var context)))
 (defmethod pass6 'var-indexed [context [_ var-symbol var-index]]
@@ -496,10 +493,32 @@
 ; PASS 10
 ; resolve var nodes
 ; resolve var-indexed nodes
-(defmulti pass10 first)
-(defmethod pass10 :default [n] n)
-(defmethod pass10 'var [[_ var-symbol]] var-symbol)
-(defmethod pass10 'var-indexed [[_ var-symbol var-index]] (list 'get-in var-symbol (vec (map dec var-index))))
+(defmulti pass10 (fn [_ n] (first n)))
+(defmethod pass10 :default [_ n] n)
+(defmethod pass10 'var [_ [_ var-symbol]] var-symbol)
+(defmethod pass10 'var-indexed [data [_ var-symbol var-index]]
+        ; changes :all to appropriate (range) expression
+  (let [var-index (map
+                    (fn [i index] (if (= :all index)
+                                    ; we need to output 1-starting indeces values to decrease them below
+                                    (->> (get data var-symbol)
+                                         count-array
+                                         (nnth i)
+                                         inc
+                                         (range 1))
+                                    index))
+                    (range) var-index)
+        var-index (map #(if (coll? %) % (list %)) var-index)
+        lens (filter (comp not (partial = 1)) (map count var-index))
+        indeces (apply combo/cartesian-product var-index)
+        ; decrease indeces
+        indeces (map (partial map dec) indeces)
+        elements (map #(concat (list 'get-in var-symbol) [(vec %)]) indeces)]
+    (if (empty? lens)
+      (first elements)
+      (v2m elements lens))))
+
+
 
 ; PASS 11
 ; combine data and model into final output
@@ -526,6 +545,8 @@
              (walk-ast pass2)
              (walk-ast prewalk (partial pass3 {:data data-map}))
              pass4)
+        p4
+        (map partial-eval (map (partial sub-var data-map) p4))
         p5
         (zv/visit (z/seq-zip p4)
               {:data data-map :max-indexed-vars {}}
@@ -535,7 +556,7 @@
               (map vec
                    (initiate-nil-arrays (-> p5 :state :max-indexed-vars))))
         edges (filter (complement empty?) (map (partial pass6 {}) p4))
-        ; TODO this is so ugly, fix it
+        ; ; TODO this is so ugly, fix it
         edges (partition 2 (flatten edges))
         v2n (into {} (map pass7 p4))
         g (apply digraph edges)
@@ -547,7 +568,14 @@
         ordered-rels (filter (complement empty?) ordered-rels1)
         p8 (map (partial pass8 data-map) ordered-rels)
         p9 (map pass9 p8)
-        p10 (map (fn [[var expr]] (list var (walk-ast pass10 expr))) p9)
+        p91 (sub-var data-map p9)
+        p92 (sub-range p91)
+        p10 (map (fn [[var expr]] (list var (walk-ast (partial pass10 data-map) expr))) p92)
         output (pass11 data-map p10)
         foppl-ds (list 'foppl-query output)]
     foppl-ds))
+
+; (let [data-file "examples/temp-data.R"
+;       model-file "examples/temp.bug"]
+;   (translate-bugs-to-foppl model-file data-file))
+;TODO think about where do you actually have to sub-var and partial-eval nodes

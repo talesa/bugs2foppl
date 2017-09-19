@@ -31,12 +31,13 @@
 
 (defn v2m
   "Forms an nested vector array of dimensions dims from a vector coll."
-  [coll lens]
-  {:pre [(= (apply * lens) (count coll))]}
-  (if (count1? lens)
-    (vec coll)
-    (let [partitioned (partition (apply * (rest lens)) coll)]
-      (vec (map #(v2m % (rest lens)) partitioned)))))
+  ([coll lens]
+   {:pre [(= (apply * lens) (count coll))]}
+   (if (count1? lens)
+     (vec coll)
+     (let [partitioned (partition (apply * (rest lens)) coll)]
+       (vec (map #(v2m % (rest lens)) partitioned)))))
+  ([lens] (v2m (take (apply * lens) (range)) lens)))
 
 (defn node? [n] (and (seq? n) ((some-fn keyword? symbol?) (first n))))
 
@@ -131,6 +132,8 @@
    node))
 
 (defn sub-range
+  "Substitutes ranges of (range-inclusive min max) to (range min (inc max)).
+   Assumes that expressions are already evaluated to numbers, otherwise returns original node."
   [node]
   (walk-ast
    (node-traversal-method 'range-inclusive
@@ -177,3 +180,8 @@
 (defn asinh [e] (Math/log (+ e (Math/sqrt (+ (* e e) 1)))))
 (defn acosh [e] (Math/log (+ e (Math/sqrt (- (* e e) 1)))))
 (defn atanh [e] (* 0.5 (Math/log (/ (+ 1 e) (- 1 e)))))
+
+(defn count-array [v]
+  (if (coll? (first v))
+    (vec (concat [(count v)] (count-array (first v))))
+    [(count v)]))

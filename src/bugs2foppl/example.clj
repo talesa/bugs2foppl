@@ -4,11 +4,14 @@
            [bugs2foppl.core :refer [translate-bugs-to-foppl]] :reload
            [bugs2foppl.utils :refer [plot-foppl-graph save-foppl-graph]] :reload
            [clojure.repl :refer [pst]])
-  (use [anglican runtime]
+  (use
+       [anglican runtime]
        [clojure.pprint :only [pprint]]))
 
 (let [model-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds.bug"
       data-file "examples/examples_JAGS/classic-bugs/vol1/seeds/seeds-data-short.R"
-      foppl-model (translate-bugs-to-foppl model-file data-file)
-      [G E] (eval foppl-model)]
+      foppl-model (translate-bugs-to-foppl model-file data-file)]
+      ; [G E] (eval foppl-model)]
+  ; (plot-foppl-graph G)
   foppl-model)
+(pst)
