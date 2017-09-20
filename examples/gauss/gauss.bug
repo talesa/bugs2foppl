@@ -1,0 +1,7 @@
+model
+{
+  mu ~ dnorm(1, 1/5)
+  for(i in 1:N) {
+    dataset[i] ~ dnorm(mu, 1/2)
+  }
+}
