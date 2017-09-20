@@ -257,7 +257,7 @@
     "dlnorm"  (not-supported distr)
     "dlogis"  (not-supported distr)
     "dnorm"   (let [[mean tau] params
-                    std (list '(fn [e] (Math/sqrt (/ 1 e))) tau)]
+                    std (list '(fn [e] (sqrt (/ 1 e))) tau)]
                 (list 'normal mean std))
     "dpar"    (not-supported distr)
     "dunif"   (let [[a b] params] (list 'uniform-continuous a b))
@@ -279,9 +279,9 @@
   (case (str func)
     "abs"         'Math/abs
     "arccos"      'Math/acos
-    "arccosh"     '(fn [e] (Math/log (+ e (Math/sqrt (- (* e e) 1)))))
+    "arccosh"     '(fn [e] (Math/log (+ e (sqrt (- (* e e) 1)))))
     "arcsin"      'Math/asin
-    "arcsinh"     '(fn [e] (Math/log (+ e (Math/sqrt (+ (* e e) 1)))))
+    "arcsinh"     '(fn [e] (Math/log (+ e (sqrt (+ (* e e) 1)))))
     "arctan"      'Math/atan
     "arctanh"     '(fn [e] (* 0.5 (Math/log (/ (+ 1 e) (- 1 e)))))
     "cloglog"     '(fn [e] (Math/log (- (Math/log (- 1. e)))))
@@ -314,7 +314,7 @@
     "sin"         'Math/sin
     "sinh"        'Math/sinh
     "solution"    (not-supported func)
-    "sqrt"        'Math/sqrt
+    "sqrt"        'sqrt
     "step"        '(fn [e] (if (>= e 0) 1 0))
     "tan"         'Math/tan
     "tanh"        'Math/tanh
